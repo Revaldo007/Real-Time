@@ -2,7 +2,7 @@ import React, { useState, useEffect, useRef, useContext } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { ChatContext } from '../context/ChatContext'
 import { AuthContext } from '../context/AuthContext'
-import { authAPI, usersAPI, chatsAPI, messagesAPI, mediaAPI } from '../services/api'
+import { authAPI, usersAPI, chatsAPI, messagesAPI, mediaAPI, BACKEND_URL } from '../services/api'
 import { 
   MessageSquare, Search, Send, Image, Video, File, Mic, Phone, Video as VideoIcon, 
   Settings, LogOut, Check, CheckCheck, Smile, CornerUpLeft, Edit3, Trash2, X, Plus, 
@@ -381,7 +381,7 @@ export default function Chat() {
           <div className="flex items-center gap-3">
             <div className="w-10 h-10 rounded-full border border-indigo-500/20 bg-slate-950 overflow-hidden flex items-center justify-center">
               {user?.profile_image ? (
-                <img src={`http://localhost:8000${user.profile_image}`} alt="Profile" className="w-full h-full object-cover" />
+                <img src={`${BACKEND_URL}${user.profile_image}`} alt="Profile" className="w-full h-full object-cover" />
               ) : (
                 <User className="w-5 h-5 text-slate-450" />
               )}
@@ -452,7 +452,7 @@ export default function Chat() {
                 >
                   <div className="w-10 h-10 rounded-full bg-slate-950 overflow-hidden flex items-center justify-center">
                     {contact.profile_image ? (
-                      <img src={`http://localhost:8000${contact.profile_image}`} alt="Profile" className="w-full h-full object-cover" />
+                      <img src={`${BACKEND_URL}${contact.profile_image}`} alt="Profile" className="w-full h-full object-cover" />
                     ) : (
                       <User className="w-5 h-5 text-slate-500" />
                     )}
@@ -493,7 +493,7 @@ export default function Chat() {
                     <div className="relative shrink-0">
                       <div className="w-11 h-11 rounded-full bg-slate-950 border border-slate-800 overflow-hidden flex items-center justify-center">
                         {info.image ? (
-                          <img src={`http://localhost:8000${info.image}`} alt={info.name} className="w-full h-full object-cover" />
+                          <img src={`${BACKEND_URL}${info.image}`} alt={info.name} className="w-full h-full object-cover" />
                         ) : (
                           <User className="w-5 h-5 text-slate-550" />
                         )}
@@ -681,7 +681,7 @@ export default function Chat() {
                     >
                       <div className="w-10 h-10 rounded-full bg-slate-950 overflow-hidden flex items-center justify-center border border-slate-800 shrink-0">
                         {contact.profile_image ? (
-                          <img src={`http://localhost:8000${contact.profile_image}`} alt="Profile" className="w-full h-full object-cover" />
+                          <img src={`${BACKEND_URL}${contact.profile_image}`} alt="Profile" className="w-full h-full object-cover" />
                         ) : (
                           <User className="w-5 h-5 text-slate-400" />
                         )}
@@ -803,7 +803,7 @@ export default function Chat() {
               <div className="flex items-center gap-3">
                 <div className="w-10 h-10 rounded-full bg-slate-950 overflow-hidden flex items-center justify-center border border-slate-800">
                   {getChatNameAndImage(activeChat).image ? (
-                    <img src={`http://localhost:8000${getChatNameAndImage(activeChat).image}`} alt="" className="w-full h-full object-cover" />
+                    <img src={`${BACKEND_URL}${getChatNameAndImage(activeChat).image}`} alt="" className="w-full h-full object-cover" />
                   ) : (
                     <User className="w-5 h-5 text-slate-550" />
                   )}
@@ -884,25 +884,25 @@ export default function Chat() {
                         {/* Media rendering depending on message_type */}
                         {msg.message_type === 'image' && (
                           <div className="mb-2 rounded-lg overflow-hidden border border-black/10 max-w-[250px] bg-slate-950">
-                            <img src={`http://localhost:8000${msg.message}`} alt="attachment" className="w-full h-auto" />
+                            <img src={`${BACKEND_URL}${msg.message}`} alt="attachment" className="w-full h-auto" />
                           </div>
                         )}
 
                         {msg.message_type === 'video' && (
                           <div className="mb-2 rounded-lg overflow-hidden border border-black/10 max-w-[280px] bg-slate-950">
-                            <video src={`http://localhost:8000${msg.message}`} controls className="w-full" />
+                            <video src={`${BACKEND_URL}${msg.message}`} controls className="w-full" />
                           </div>
                         )}
 
                         {msg.message_type === 'voice' && (
                           <div className="mb-2 p-1 bg-black/10 rounded-lg flex items-center gap-2">
-                            <audio src={`http://localhost:8000${msg.message}`} controls className="w-52 h-8" />
+                            <audio src={`${BACKEND_URL}${msg.message}`} controls className="w-52 h-8" />
                           </div>
                         )}
 
                         {msg.message_type === 'document' && (
                           <a
-                            href={`http://localhost:8000${msg.message}`}
+                            href={`${BACKEND_URL}${msg.message}`}
                             download
                             className="mb-2 p-2 bg-black/10 hover:bg-black/20 rounded-lg flex items-center gap-2 text-xs text-indigo-200 border border-slate-700/50"
                           >
@@ -1197,7 +1197,7 @@ export default function Chat() {
             <div className="flex flex-col items-center gap-6 max-w-sm text-center">
               <div className="w-24 h-24 rounded-full border border-indigo-500/20 bg-slate-900 overflow-hidden flex items-center justify-center shadow-2xl animate-bounce">
                 {callUser?.profile_image ? (
-                  <img src={`http://localhost:8000${callUser.profile_image}`} alt="" className="w-full h-full object-cover" />
+                  <img src={`${BACKEND_URL}${callUser.profile_image}`} alt="" className="w-full h-full object-cover" />
                 ) : (
                   <User className="w-10 h-10 text-slate-500" />
                 )}
@@ -1231,7 +1231,7 @@ export default function Chat() {
             <div className="flex flex-col items-center gap-6 max-w-sm text-center">
               <div className="w-24 h-24 rounded-full border border-indigo-500/20 bg-slate-900 overflow-hidden flex items-center justify-center shadow-2xl animate-pulse">
                 {callUser?.profile_image ? (
-                  <img src={`http://localhost:8000${callUser.profile_image}`} alt="" className="w-full h-full object-cover" />
+                  <img src={`${BACKEND_URL}${callUser.profile_image}`} alt="" className="w-full h-full object-cover" />
                 ) : (
                   <User className="w-10 h-10 text-slate-500" />
                 )}
@@ -1281,7 +1281,7 @@ export default function Chat() {
                   <div className="flex flex-col items-center gap-4">
                     <div className="w-24 h-24 rounded-full border border-indigo-500/20 bg-slate-950 overflow-hidden flex items-center justify-center shadow-lg">
                       {callUser?.profile_image ? (
-                        <img src={`http://localhost:8000${callUser.profile_image}`} alt="" className="w-full h-full object-cover" />
+                        <img src={`${BACKEND_URL}${callUser.profile_image}`} alt="" className="w-full h-full object-cover" />
                       ) : (
                         <User className="w-10 h-10 text-slate-500" />
                       )}

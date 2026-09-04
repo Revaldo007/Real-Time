@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useAuth } from '../hooks/useAuth'
-import { mediaAPI } from '../services/api'
+import { mediaAPI, BACKEND_URL } from '../services/api'
 import { ArrowLeft, User, Info, Camera, Sparkles, Check, AlertCircle } from 'lucide-react'
 
 export default function Profile() {
@@ -107,7 +107,7 @@ export default function Profile() {
               <div className="w-28 h-28 rounded-full border-2 border-indigo-500/30 overflow-hidden bg-slate-950 flex items-center justify-center">
                 {avatar ? (
                   <img
-                    src={`http://localhost:8000${avatar}`}
+                    src={`${BACKEND_URL}${avatar}`}
                     alt="Profile Avatar"
                     className="w-full h-full object-cover"
                   />

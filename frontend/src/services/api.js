@@ -1,7 +1,9 @@
 import axios from 'axios'
 
+export const BACKEND_URL = `http://${window.location.hostname}:8000`
+
 const API = axios.create({
-  baseURL: 'http://localhost:8000',
+  baseURL: BACKEND_URL,
 })
 
 // Interceptor to inject token on every request

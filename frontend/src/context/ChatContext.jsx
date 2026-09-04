@@ -110,7 +110,8 @@ export const ChatProvider = ({ children }) => {
       return
     }
 
-    const wsUrl = `ws://localhost:8000/ws?token=${token}`
+    const wsProtocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:'
+    const wsUrl = `${wsProtocol}//${window.location.hostname}:8000/ws?token=${token}`
     const ws = new WebSocket(wsUrl)
     socketRef.current = ws
 

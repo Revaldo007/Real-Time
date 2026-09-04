@@ -16,7 +16,12 @@ app = FastAPI(title="Rivo Chat API", version="1.0.0")
 # Setup CORS
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],  # For development. Can be restricted to ["http://localhost:5173"] in production
+    allow_origins=[
+        "http://192.168.1.38:5173",
+        "http://localhost:5173",
+        "http://127.0.0.1:5173",
+    ],
+    allow_origin_regex=r"^http://(localhost|127\.0\.0\.1|192\.168\.\d+\.\d+)(:\d+)?$",
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
