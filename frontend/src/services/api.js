@@ -1,9 +1,12 @@
 import axios from 'axios'
 
-export const BACKEND_URL = `http://${window.location.hostname}:8000`
+// All API calls go through Vite's proxy (same origin) so they work on both HTTP and HTTPS.
+// The proxy in vite.config.js forwards /api -> backend:8000, /uploads -> backend:8000, etc.
+// DO NOT use http://hostname:8000 directly — browsers block HTTP requests from HTTPS pages (mixed content).
+export const BACKEND_URL = ''
 
 const API = axios.create({
-  baseURL: BACKEND_URL,
+  baseURL: '/',   // relative base — all routes go through Vite proxy
 })
 
 // Interceptor to inject token on every request
@@ -18,6 +21,9 @@ API.interceptors.request.use((config) => {
 })
 
 export const authAPI = {
+  checkPhone: (phoneNumber) => API.post('/auth/check-phone', { phone_number: phoneNumber }),
+  sendOtp: (email, phoneNumber = null) => API.post('/auth/send-otp', { email, phone_number: phoneNumber }),
+  verifyOtp: (email, otp, phoneNumber = null) => API.post('/auth/verify-otp', { email, otp, phone_number: phoneNumber }),
   register: (phoneNumber, username = null) => API.post('/auth/register', { phone_number: phoneNumber, username }),
   login: (phoneNumber) => API.post('/auth/login/json', { phone_number: phoneNumber }),
   getMe: () => API.get('/auth/me'),
@@ -37,6 +43,7 @@ export const chatsAPI = {
   updateGroupDetails: (chatId, name, description, groupImage) => API.put(`/groups/${chatId}/details`, { name, description, group_image: groupImage }),
   addGroupMember: (chatId, userId) => API.post(`/groups/${chatId}/members/add`, { user_id: userId }),
   removeGroupMember: (chatId, userId) => API.post(`/groups/${chatId}/members/remove/${userId}`),
+  delete: (chatId) => API.delete(`/chats/${chatId}`),
 }
 
 export const messagesAPI = {

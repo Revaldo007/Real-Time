@@ -28,22 +28,31 @@ export const AuthProvider = ({ children }) => {
     checkAuth()
   }, [token])
 
-  const login = async (phoneNumber) => {
+  const login = async (phoneNumber, preIssuedToken = null) => {
     setLoading(true)
     try {
-      let res
-      try {
-        res = await authAPI.login(phoneNumber)
-      } catch (err) {
-        // If user not found on login, try registering automatically (WhatsApp-like onboarding)
-        if (err.response?.status === 401 || err.response?.status === 404) {
-          await authAPI.register(phoneNumber, `User_${phoneNumber.slice(-4)}`)
+      let accessToken
+
+      if (preIssuedToken) {
+        // Email OTP flow: token already obtained from /auth/verify-otp
+        accessToken = preIssuedToken
+      } else {
+        // Legacy phone flow
+        let res
+        try {
           res = await authAPI.login(phoneNumber)
-        } else {
-          throw err
+        } catch (err) {
+          // If user not found on login, try registering automatically (WhatsApp-like onboarding)
+          if (err.response?.status === 401 || err.response?.status === 404) {
+            await authAPI.register(phoneNumber, `User_${phoneNumber.slice(-4)}`)
+            res = await authAPI.login(phoneNumber)
+          } else {
+            throw err
+          }
         }
+        accessToken = res.data.access_token
       }
-      const accessToken = res.data.access_token
+
       localStorage.setItem('token', accessToken)
       setToken(accessToken)
       

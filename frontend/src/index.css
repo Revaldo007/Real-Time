@@ -1,1 +1,93 @@
 @import "tailwindcss";
+
+/* ── Mobile Chat Layout ── */
+@media (max-width: 767px) {
+
+  /* SIDEBAR: full screen on mobile */
+  .chat-sidebar {
+    display: flex !important;
+    flex-direction: column;
+    width: 100% !important;
+    height: 100% !important;
+    height: var(--visual-viewport-height, 100dvh) !important;
+    max-height: var(--visual-viewport-height, 100dvh) !important;
+    position: fixed !important;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    z-index: 10;
+  }
+
+  .chat-sidebar.mobile-hidden {
+    display: none !important;
+  }
+
+  /* CHAT PANEL: full screen on mobile, flex column so input sticks to bottom */
+  .chat-panel {
+    display: flex !important;
+    flex-direction: column;
+    width: 100% !important;
+    height: 100% !important;
+    height: var(--visual-viewport-height, 100dvh) !important;
+    max-height: var(--visual-viewport-height, 100dvh) !important;
+    position: fixed !important;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    z-index: 10;
+  }
+
+  .chat-panel.mobile-hidden {
+    display: none !important;
+  }
+
+  /* Make message feed fill the available space between header and input bar */
+  .chat-panel .chat-messages-feed {
+    flex: 1 1 0%;
+    overflow-y: auto;
+    min-height: 0;
+  }
+
+  /* Mobile input bar rules to prevent horizontal overflow */
+  .chat-input-form {
+    display: flex !important;
+    align-items: center !important;
+    width: 100% !important;
+    max-width: 100% !important;
+    gap: 6px !important;
+    box-sizing: border-box !important;
+    overflow: visible !important;
+  }
+
+  .chat-input-form input {
+    min-width: 0 !important;
+    flex: 1 1 0% !important;
+    box-sizing: border-box !important;
+  }
+
+  .chat-input-form button {
+    flex-shrink: 0 !important;
+  }
+}
+
+/* On desktop (>= 768px): both panels shown side by side */
+@media (min-width: 768px) {
+  .chat-sidebar {
+    width: 360px;
+    display: flex !important;
+    flex-direction: column;
+  }
+
+  .chat-panel {
+    flex: 1;
+    display: flex !important;
+    flex-direction: column;
+  }
+
+  /* Hide the back button on desktop */
+  .chat-back-btn {
+    display: none !important;
+  }
+}

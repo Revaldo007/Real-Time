@@ -255,3 +255,47 @@ def remove_member_from_group(db: Session, chat_id: int, admin_id: int, user_id_t
     db.delete(member)
     db.commit()
     return {"message": "Member removed successfully"}
+
+
+def delete_chat_for_user(db: Session, chat_id: int, user_id: int):
+    """
+    For one_to_one chats: fully deletes the entire chat (and all messages via CASCADE).
+    For group chats: removes the user from the group (leave group). If no members remain, deletes the chat.
+    """
+    chat = db.query(Chat).filter(Chat.id == chat_id).first()
+    if not chat:
+        raise HTTPException(status_code=404, detail="Chat not found")
+
+    # Verify the user is a member
+    if chat.type == "one_to_one":
+        member = db.query(ChatMember).filter(
+            and_(ChatMember.chat_id == chat_id, ChatMember.user_id == user_id)
+        ).first()
+        if not member:
+            raise HTTPException(status_code=403, detail="You are not a member of this chat")
+        # Clear reply_to pointers to prevent circular foreign key issues during cascade
+        db.query(Message).filter(Message.chat_id == chat_id).update({Message.reply_to: None})
+        db.delete(chat)
+        db.commit()
+    else:
+        # Group chat — remove the user from the group
+        group = db.query(Group).filter(Group.chat_id == chat_id).first()
+        if not group:
+            raise HTTPException(status_code=404, detail="Group not found")
+        gm = db.query(GroupMember).filter(
+            and_(GroupMember.group_id == group.id, GroupMember.user_id == user_id)
+        ).first()
+        if not gm:
+            raise HTTPException(status_code=403, detail="You are not a member of this group")
+        db.delete(gm)
+        db.commit()
+        
+        # If no group members remain, delete the entire chat
+        remaining = db.query(GroupMember).filter(GroupMember.group_id == group.id).count()
+        if remaining == 0:
+            db.query(Message).filter(Message.chat_id == chat_id).update({Message.reply_to: None})
+            db.delete(chat)
+            db.commit()
+
+    return {"message": "Chat removed successfully"}
+

@@ -2,13 +2,104 @@ from fastapi import APIRouter, Depends, HTTPException, status
 from fastapi.security import OAuth2PasswordRequestForm
 from sqlalchemy.orm import Session
 from app.database.connection import get_db
-from app.schemas.user import UserCreate, UserResponse, Token, ForgotPassword, ResetPassword, UserLogin
+from app.schemas.user import (
+    UserCreate, UserResponse, Token,
+    ForgotPassword, ResetPassword, UserLogin,
+    SendOTPRequest, VerifyOTPRequest,
+    CheckPhoneRequest, CheckPhoneResponse
+)
 from app.services import auth_service
+from app.services import otp_service
 from app.core.security import create_access_token
 from app.core.dependencies import get_current_user
 from app.models.user import User
 
 router = APIRouter(prefix="/auth", tags=["auth"])
+
+
+# ── Phone and Email OTP endpoints ──────────────────────────────────────────────
+
+@router.post("/check-phone", response_model=CheckPhoneResponse)
+def check_phone(data: CheckPhoneRequest, db: Session = Depends(get_db)):
+    """
+    Check if a phone number already exists in the database.
+    - Returning user: Generates and returns JWT access_token immediately (no OTP needed).
+    - New user: Returns exists=False so frontend can prompt for email and OTP.
+    """
+    user = auth_service.get_user_by_phone(db, data.phone_number)
+    if user:
+        access_token = create_access_token(data={"sub": str(user.id)})
+        return CheckPhoneResponse(
+            exists=True,
+            phone_number=user.phone_number,
+            username=user.username,
+            access_token=access_token,
+            token_type="bearer"
+        )
+    return CheckPhoneResponse(
+        exists=False,
+        phone_number=data.phone_number
+    )
+
+
+@router.post("/send-otp")
+def send_otp(data: SendOTPRequest, db: Session = Depends(get_db)):
+    """
+    Send a 6-digit OTP to the provided email via Resend.
+    Rate limited to 3 requests per 10 minutes per email.
+    """
+    success, message, code = otp_service.send_otp_email(data.email)
+    if not success:
+        raise HTTPException(
+            status_code=status.HTTP_429_TOO_MANY_REQUESTS if "Too many" in message
+                else status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=message
+        )
+    return {
+        "message": message or "OTP sent to your email. It expires in 5 minutes.",
+        "otp_hint": code
+    }
+
+
+@router.post("/verify-otp", response_model=Token)
+def verify_otp(data: VerifyOTPRequest, db: Session = Depends(get_db)):
+    """
+    Verify the OTP for the given email.
+    On success, creates or updates the user associated with phone_number & email,
+    and returns a JWT access token.
+    """
+    ok, reason = otp_service.verify_otp(data.email, data.otp)
+    if not ok:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=reason)
+
+    user = None
+    if data.phone_number:
+        user = auth_service.get_user_by_phone(db, data.phone_number)
+
+    if not user:
+        user = auth_service.get_user_by_email(db, data.email)
+
+    if not user:
+        # Register new user with the given phone number and email
+        phone = data.phone_number if data.phone_number else f"email_{data.email.replace('@', '_').replace('.', '_')}"
+        user_data = UserCreate(
+            phone_number=phone,
+            email=data.email,
+            username=None,
+        )
+        user = auth_service.register_user(db, user_data)
+    else:
+        # Link email if not already present
+        if not user.email:
+            user.email = data.email
+            db.commit()
+            db.refresh(user)
+
+    access_token = create_access_token(data={"sub": str(user.id)})
+    return {"access_token": access_token, "token_type": "bearer"}
+
+
+# ── Legacy endpoints (kept for backwards compatibility) ───────────────────────
 
 @router.post("/register", response_model=UserResponse)
 def register(user_data: UserCreate, db: Session = Depends(get_db)):

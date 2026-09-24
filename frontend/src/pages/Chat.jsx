@@ -4,7 +4,7 @@ import { ChatContext } from '../context/ChatContext'
 import { AuthContext } from '../context/AuthContext'
 import { authAPI, usersAPI, chatsAPI, messagesAPI, mediaAPI, BACKEND_URL } from '../services/api'
 import { 
-  MessageSquare, Search, Send, Image, Video, File, Mic, Phone, Video as VideoIcon, 
+  MessageSquare, MessageSquarePlus, Search, Send, Image, Video, File, Mic, Phone, Video as VideoIcon, 
   Settings, LogOut, Check, CheckCheck, Smile, CornerUpLeft, Edit3, Trash2, X, Plus, 
   Users, UserPlus, ShieldAlert, MicOff, Volume2, User, Play, Pause, Paperclip,
   ArrowLeft, MoreVertical
@@ -20,6 +20,12 @@ export default function Chat() {
 
   const navigate = useNavigate()
   
+  // Mobile view state: 'sidebar' | 'chat'
+  const [mobileView, setMobileView] = useState('sidebar')
+
+  // Avatar tap popup: holds the chat object whose avatar was tapped, or null
+  const [avatarMenuChat, setAvatarMenuChat] = useState(null)
+
   // Left Sidebar States
   const [searchQuery, setSearchQuery] = useState('')
   const [searchResults, setSearchResults] = useState([])
@@ -132,10 +138,12 @@ export default function Chat() {
 
   // Voice Note Recorder States
   const [isRecording, setIsRecording] = useState(false)
+  const [isUploadingVoice, setIsUploadingVoice] = useState(false)
   const [recordingSeconds, setRecordingSeconds] = useState(0)
   const mediaRecorderRef = useRef(null)
   const recordingIntervalRef = useRef(null)
   const audioChunksRef = useRef([])
+  const isDiscardingVoiceRef = useRef(false)
 
   // File Upload Ref
   const fileInputRef = useRef(null)
@@ -151,6 +159,28 @@ export default function Chat() {
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' })
   }, [messages])
+
+  // Adapt container when mobile virtual keyboard opens/closes
+  useEffect(() => {
+    if (typeof window === 'undefined' || !window.visualViewport) return
+
+    const handleVisualResize = () => {
+      const height = window.visualViewport.height
+      document.documentElement.style.setProperty('--visual-viewport-height', `${height}px`)
+      if (activeChat) {
+        messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' })
+      }
+    }
+
+    window.visualViewport.addEventListener('resize', handleVisualResize)
+    window.visualViewport.addEventListener('scroll', handleVisualResize)
+    handleVisualResize()
+
+    return () => {
+      window.visualViewport.removeEventListener('resize', handleVisualResize)
+      window.visualViewport.removeEventListener('scroll', handleVisualResize)
+    }
+  }, [activeChat])
 
   // Attach WebRTC streams
   useEffect(() => {
@@ -209,9 +239,34 @@ export default function Chat() {
       setActiveChat(res.data)
       setSearchQuery('')
       setShowSearch(false)
+      setMobileView('chat')
       fetchChats()
     } catch (err) {
       console.error(err)
+    }
+  }
+
+  // Delete / Leave a chat
+  const handleDeleteChat = async (chat) => {
+    if (!chat || !chat.id) return
+    const info = getChatNameAndImage(chat)
+    const label = chat.type === 'one_to_one' 
+      ? `Remove ${info.name} and delete this chat?` 
+      : `Leave and remove group "${info.name}"?`
+    if (!window.confirm(label)) return
+    try {
+      await chatsAPI.delete(chat.id)
+      if (activeChat && activeChat.id === chat.id) {
+        setActiveChat(null)
+        setMobileView('sidebar')
+      }
+      setAvatarMenuChat(null)
+      fetchChats()
+    } catch (err) {
+      console.error('Failed to remove chat', err)
+      alert(err?.response?.data?.detail || 'Failed to remove chat')
+    } finally {
+      setAvatarMenuChat(null)
     }
   }
 
@@ -273,51 +328,111 @@ export default function Chat() {
 
   // Voice note recording logic
   const startVoiceRecording = async () => {
+    if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+      alert("Microphone access is unavailable. Note: Mobile and desktop browsers block microphone access over non-secure HTTP (e.g. http://192.168.x.x). Please test on localhost or via HTTPS.")
+      return
+    }
+
     try {
+      // Check best supported audio format for browser (Chrome, Firefox, Safari iOS/macOS)
+      let selectedMimeType = ''
+      let selectedExt = 'webm'
+      if (typeof MediaRecorder !== 'undefined') {
+        if (MediaRecorder.isTypeSupported('audio/webm;codecs=opus')) {
+          selectedMimeType = 'audio/webm;codecs=opus'
+          selectedExt = 'webm'
+        } else if (MediaRecorder.isTypeSupported('audio/webm')) {
+          selectedMimeType = 'audio/webm'
+          selectedExt = 'webm'
+        } else if (MediaRecorder.isTypeSupported('audio/mp4')) {
+          selectedMimeType = 'audio/mp4'
+          selectedExt = 'mp4'
+        } else if (MediaRecorder.isTypeSupported('audio/ogg')) {
+          selectedMimeType = 'audio/ogg'
+          selectedExt = 'ogg'
+        }
+      }
+
       const stream = await navigator.mediaDevices.getUserMedia({ audio: true })
-      const mediaRecorder = new MediaRecorder(stream)
+      const mediaRecorder = selectedMimeType 
+        ? new MediaRecorder(stream, { mimeType: selectedMimeType })
+        : new MediaRecorder(stream)
+
       mediaRecorderRef.current = mediaRecorder
       audioChunksRef.current = []
+      isDiscardingVoiceRef.current = false
 
       mediaRecorder.ondataavailable = (event) => {
-        if (event.data.size > 0) {
+        if (event.data && event.data.size > 0) {
           audioChunksRef.current.push(event.data)
         }
       }
 
       mediaRecorder.onstop = async () => {
-        const audioBlob = new Blob(audioChunksRef.current, { type: 'audio/webm' })
-        const audioFile = new File([audioBlob], 'voice_note.webm', { type: 'audio/webm' })
+        // Stop hardware microphone tracks
+        stream.getTracks().forEach(track => track.stop())
+
+        if (isDiscardingVoiceRef.current) {
+          isDiscardingVoiceRef.current = false
+          audioChunksRef.current = []
+          return
+        }
+
+        if (!audioChunksRef.current.length) return
+
+        const mime = selectedMimeType || 'audio/webm'
+        const audioBlob = new Blob(audioChunksRef.current, { type: mime })
+        const audioFile = new File([audioBlob], `voice_note_${Date.now()}.${selectedExt}`, { type: mime })
         
         try {
+          setIsUploadingVoice(true)
           const uploadRes = await mediaAPI.upload(audioFile)
           await messagesAPI.send(activeChat.id, uploadRes.data.file_url, 'voice')
         } catch (err) {
           console.error('Voice note upload failed', err)
+          alert('Failed to send voice note. ' + (err?.response?.data?.detail || 'Please try again.'))
+        } finally {
+          setIsUploadingVoice(false)
+          setRecordingSeconds(0)
+          audioChunksRef.current = []
         }
-        
-        // Stop audio tracks
-        stream.getTracks().forEach(track => track.stop())
       }
 
-      mediaRecorder.start()
+      mediaRecorder.start(250)
       setIsRecording(true)
       setRecordingSeconds(0)
+      if (recordingIntervalRef.current) clearInterval(recordingIntervalRef.current)
       recordingIntervalRef.current = setInterval(() => {
         setRecordingSeconds(prev => prev + 1)
       }, 1000)
 
     } catch (err) {
-      console.error('Microphone access denied', err)
+      console.error('Microphone error', err)
+      if (err.name === 'NotAllowedError' || err.name === 'PermissionDeniedError') {
+        alert("Microphone permission was denied. Please allow microphone access in your browser site settings.")
+      } else {
+        alert("Could not access microphone: " + (err.message || 'Check browser permissions'))
+      }
     }
   }
 
-  const stopVoiceRecording = () => {
-    if (mediaRecorderRef.current && isRecording) {
+  const cancelVoiceRecording = () => {
+    isDiscardingVoiceRef.current = true
+    if (mediaRecorderRef.current && mediaRecorderRef.current.state !== 'inactive') {
       mediaRecorderRef.current.stop()
-      clearInterval(recordingIntervalRef.current)
-      setIsRecording(false)
     }
+    if (recordingIntervalRef.current) clearInterval(recordingIntervalRef.current)
+    setIsRecording(false)
+    setRecordingSeconds(0)
+  }
+
+  const sendVoiceRecording = () => {
+    isDiscardingVoiceRef.current = false
+    if (mediaRecorderRef.current && mediaRecorderRef.current.state !== 'inactive') {
+      mediaRecorderRef.current.stop()
+    }
+    if (recordingIntervalRef.current) clearInterval(recordingIntervalRef.current)
+    setIsRecording(false)
   }
 
   // Message Actions
@@ -347,18 +462,32 @@ export default function Chat() {
   }
 
   const getChatNameAndImage = (chat) => {
-    if (chat.type === 'one_to_one') {
-      const otherMember = chat.members.find(m => m.user_id !== user?.id)
+    if (!chat) return { name: '', image: null, isOnline: false, about: '', phone: '' }
+    if (chat.isUnsavedContact && chat.targetContact) {
       return {
-        name: otherMember?.user.username || 'Direct Chat',
-        image: otherMember?.user.profile_image,
-        isOnline: onlineUsers.has(otherMember?.user_id)
+        name: chat.targetContact.username || 'Contact',
+        image: chat.targetContact.profile_image,
+        isOnline: onlineUsers.has(chat.targetContact.id),
+        about: chat.targetContact.about,
+        phone: chat.targetContact.phone_number
+      }
+    }
+    if (chat.type === 'one_to_one') {
+      const otherMember = chat.members?.find(m => m.user_id !== user?.id)
+      return {
+        name: otherMember?.user?.username || 'Direct Chat',
+        image: otherMember?.user?.profile_image,
+        isOnline: otherMember ? onlineUsers.has(otherMember.user_id) : false,
+        about: otherMember?.user?.about,
+        phone: otherMember?.user?.phone_number
       }
     } else {
       return {
         name: chat.group_details?.name || 'Group Chat',
         image: chat.group_details?.group_image,
-        isOnline: false
+        isOnline: false,
+        about: chat.group_details?.description,
+        phone: null
       }
     }
   }
@@ -375,7 +504,7 @@ export default function Chat() {
     <div className="flex h-screen w-screen bg-slate-950 text-slate-100 overflow-hidden relative">
       
       {/* 1. LEFT SIDEBAR */}
-      <div className="w-[360px] h-full bg-slate-900/40 backdrop-blur-md border-r border-slate-800 flex flex-col shrink-0 relative">
+      <div className={`chat-sidebar h-full bg-slate-900/40 backdrop-blur-md border-r border-slate-800 flex flex-col shrink-0 relative ${mobileView === 'chat' ? 'mobile-hidden' : ''}`}>
         {/* Sidebar Header */}
         <div className="h-16 px-4 border-b border-slate-800 flex items-center justify-between relative bg-slate-900/50">
           <div className="flex items-center gap-3">
@@ -486,12 +615,18 @@ export default function Chat() {
                 return (
                   <div
                     key={chat.id}
-                    onClick={() => setActiveChat(chat)}
+                    onClick={() => { setActiveChat(chat); setMobileView('chat') }}
                     className={`flex items-center gap-3 p-4 hover:bg-slate-850/30 cursor-pointer transition relative ${isActive ? 'bg-indigo-600/10 hover:bg-indigo-600/15 border-l-2 border-indigo-500' : ''}`}
                   >
-                    {/* Avatar with Presence dot */}
-                    <div className="relative shrink-0">
-                      <div className="w-11 h-11 rounded-full bg-slate-950 border border-slate-800 overflow-hidden flex items-center justify-center">
+                    {/* Avatar with Presence dot — click to open context menu */}
+                    <div
+                      className="relative shrink-0"
+                      onClick={(e) => {
+                        e.stopPropagation() // don't open the chat
+                        setAvatarMenuChat(chat)
+                      }}
+                    >
+                      <div className="w-11 h-11 rounded-full bg-slate-950 border border-slate-800 overflow-hidden flex items-center justify-center cursor-pointer hover:ring-2 hover:ring-rose-500/60 hover:ring-offset-1 hover:ring-offset-slate-900 transition-all">
                         {info.image ? (
                           <img src={`${BACKEND_URL}${info.image}`} alt={info.name} className="w-full h-full object-cover" />
                         ) : (
@@ -530,16 +665,13 @@ export default function Chat() {
           </div>
         )}
 
-        {/* WhatsApp Floating Action Button (FAB) */}
+        {/* Rivo New Chat Floating Action Button (FAB) */}
         <button
           onClick={handleOpenSelectContact}
-          className="absolute bottom-6 right-6 z-20 w-14 h-14 bg-[#00a884] hover:bg-[#008f70] active:scale-95 text-white rounded-2xl shadow-xl shadow-emerald-950/40 flex items-center justify-center transition-all cursor-pointer group"
-          title="Select Contact"
+          className="absolute bottom-6 right-6 z-20 w-13 h-13 sm:w-14 sm:h-14 bg-gradient-to-tr from-indigo-600 via-indigo-500 to-violet-500 hover:from-indigo-500 hover:to-violet-400 active:scale-95 text-white rounded-2xl sm:rounded-3xl shadow-xl shadow-indigo-600/35 border border-indigo-400/30 flex items-center justify-center transition-all duration-200 cursor-pointer group hover:shadow-indigo-500/50 hover:-translate-y-0.5"
+          title="New Chat"
         >
-          <div className="relative flex items-center justify-center">
-            <MessageSquare className="w-7 h-7 fill-white stroke-none" />
-            <Plus className="w-4 h-4 text-[#00a884] absolute font-black stroke-[3.5]" />
-          </div>
+          <MessageSquarePlus className="w-6 h-6 text-white group-hover:scale-110 transition-transform duration-200 drop-shadow" />
         </button>
 
         {/* SELECT CONTACT PANEL (WhatsApp Style) */}
@@ -569,7 +701,7 @@ export default function Chat() {
             <div className="absolute inset-0 z-30 bg-slate-900 flex flex-col animate-in slide-in-from-left duration-200">
               {/* Header */}
               {showSelectContactSearch ? (
-                <div className="h-16 px-4 bg-[#00a884] text-white flex items-center gap-3 shadow-md">
+                <div className="h-16 px-4 bg-gradient-to-r from-indigo-600 via-indigo-500 to-violet-600 text-white flex items-center gap-3 shadow-md">
                   <button 
                     onClick={() => {
                       setShowSelectContactSearch(false)
@@ -586,7 +718,7 @@ export default function Chat() {
                       value={selectContactQuery}
                       onChange={(e) => setSelectContactQuery(e.target.value)}
                       placeholder="Search contacts..."
-                      className="w-full bg-transparent text-sm text-white placeholder-emerald-100 focus:outline-none"
+                      className="w-full bg-transparent text-sm text-white placeholder-indigo-200 focus:outline-none"
                     />
                   </div>
                   {selectContactQuery && (
@@ -599,14 +731,14 @@ export default function Chat() {
                   )}
                 </div>
               ) : (
-                <div className="h-16 px-4 bg-[#00a884] text-white flex items-center justify-between shadow-md">
+                <div className="h-16 px-4 bg-gradient-to-r from-indigo-600 via-indigo-500 to-violet-600 text-white flex items-center justify-between shadow-md">
                   <div className="flex items-center gap-4">
                     <button onClick={() => setShowSelectContact(false)} className="p-1 rounded-full hover:bg-black/10 transition cursor-pointer">
                       <ArrowLeft className="w-5 h-5" />
                     </button>
                     <div>
-                      <h2 className="text-base font-semibold leading-tight">Select contact</h2>
-                      <span className="text-xs opacity-90">{displayedContacts.length} contacts</span>
+                      <h2 className="text-base font-semibold leading-tight font-outfit">Select contact</h2>
+                      <span className="text-xs opacity-90 text-indigo-100">{displayedContacts.length} contacts</span>
                     </div>
                   </div>
                   <div className="flex items-center gap-2">
@@ -637,7 +769,7 @@ export default function Chat() {
                       }}
                       className="flex items-center gap-4 p-3 hover:bg-slate-800/60 rounded-xl cursor-pointer transition"
                     >
-                      <div className="w-10 h-10 rounded-full bg-[#00a884] flex items-center justify-center text-white shadow-sm">
+                      <div className="w-10 h-10 rounded-full bg-gradient-to-tr from-indigo-500 to-violet-500 flex items-center justify-center text-white shadow-md shadow-indigo-500/20">
                         <Users className="w-5 h-5" />
                       </div>
                       <span className="text-sm font-medium text-slate-100">New group</span>
@@ -648,7 +780,7 @@ export default function Chat() {
                       onClick={() => setShowNewContact(true)}
                       className="flex items-center gap-4 p-3 hover:bg-slate-800/60 rounded-xl cursor-pointer transition"
                     >
-                      <div className="w-10 h-10 rounded-full bg-[#00a884] flex items-center justify-center text-white shadow-sm">
+                      <div className="w-10 h-10 rounded-full bg-gradient-to-tr from-indigo-500 to-violet-500 flex items-center justify-center text-white shadow-md shadow-indigo-500/20">
                         <UserPlus className="w-5 h-5" />
                       </div>
                       <div className="flex-1 flex items-center justify-between">
@@ -660,7 +792,7 @@ export default function Chat() {
                 )}
 
                 {/* Contacts Section Header */}
-                <div className="px-4 py-2.5 text-xs font-semibold text-emerald-400 bg-slate-950/60 uppercase tracking-wider">
+                <div className="px-4 py-2.5 text-xs font-semibold text-indigo-400 bg-slate-950/60 uppercase tracking-wider">
                   Contacts on Rivo
                 </div>
 
@@ -679,7 +811,25 @@ export default function Chat() {
                       }}
                       className="flex items-center gap-3 p-3.5 hover:bg-indigo-600/10 cursor-pointer transition"
                     >
-                      <div className="w-10 h-10 rounded-full bg-slate-950 overflow-hidden flex items-center justify-center border border-slate-800 shrink-0">
+                      <div 
+                        className="w-10 h-10 rounded-full bg-slate-950 overflow-hidden flex items-center justify-center border border-slate-800 shrink-0 cursor-pointer hover:ring-2 hover:ring-rose-500/60 hover:ring-offset-1 hover:ring-offset-slate-900 transition-all"
+                        onClick={(e) => {
+                          e.stopPropagation()
+                          const existingChat = chats.find(c => c.type === 'one_to_one' && c.members?.some(m => m.user_id === contact.id))
+                          if (existingChat) {
+                            setAvatarMenuChat(existingChat)
+                          } else {
+                            setAvatarMenuChat({
+                              id: null,
+                              type: 'one_to_one',
+                              isUnsavedContact: true,
+                              targetContact: contact,
+                              members: [{ user_id: contact.id, user: contact }]
+                            })
+                          }
+                        }}
+                        title="View Profile / Remove"
+                      >
                         {contact.profile_image ? (
                           <img src={`${BACKEND_URL}${contact.profile_image}`} alt="Profile" className="w-full h-full object-cover" />
                         ) : (
@@ -698,15 +848,15 @@ export default function Chat() {
           )
         })()}
 
-        {/* NEW CONTACT PANEL (WhatsApp Style) */}
+        {/* NEW CONTACT PANEL */}
         {showNewContact && (
           <div className="absolute inset-0 z-40 bg-slate-900 flex flex-col animate-in slide-in-from-right duration-200">
             {/* Header */}
-            <div className="h-16 px-4 bg-[#00a884] text-white flex items-center gap-4 shadow-md">
+            <div className="h-16 px-4 bg-gradient-to-r from-indigo-600 via-indigo-500 to-violet-600 text-white flex items-center gap-4 shadow-md">
               <button onClick={() => setShowNewContact(false)} className="p-1 rounded-full hover:bg-black/10 transition cursor-pointer">
                 <ArrowLeft className="w-5 h-5" />
               </button>
-              <h2 className="text-base font-semibold">New contact</h2>
+              <h2 className="text-base font-semibold font-outfit">New contact</h2>
             </div>
 
             {/* Form Body */}
@@ -721,14 +871,14 @@ export default function Chat() {
                 {/* Name */}
                 <div className="relative flex items-center gap-4">
                   <User className="w-5 h-5 text-slate-400 shrink-0 mt-3" />
-                  <div className="flex-1 border-b border-slate-700 focus-within:border-emerald-500 pb-1">
+                  <div className="flex-1 border-b border-slate-700 focus-within:border-indigo-500 pb-1">
                     <label className="block text-[10px] text-slate-400 uppercase">Name</label>
                     <input
                       type="text"
                       required
                       value={newName}
                       onChange={(e) => setNewName(e.target.value)}
-                      placeholder="e.g. Beebom"
+                      placeholder="e.g. John Doe"
                       className="w-full text-sm bg-transparent text-slate-100 focus:outline-none placeholder-slate-600"
                     />
                   </div>
@@ -738,16 +888,16 @@ export default function Chat() {
                 <div className="relative flex items-center gap-4">
                   <Phone className="w-5 h-5 text-slate-400 shrink-0 mt-3" />
                   <div className="flex gap-3 flex-1">
-                    <div className="w-20 border-b border-slate-700 focus-within:border-emerald-500 pb-1">
+                    <div className="w-20 border-b border-slate-700 focus-within:border-indigo-500 pb-1">
                       <label className="block text-[10px] text-slate-400 uppercase">Country</label>
                       <input
                         type="text"
                         value={newCountryCode}
                         onChange={(e) => setNewCountryCode(e.target.value)}
-                        className="w-full text-sm font-semibold bg-transparent text-emerald-400 focus:outline-none"
+                        className="w-full text-sm font-semibold bg-transparent text-indigo-400 focus:outline-none"
                       />
                     </div>
-                    <div className="flex-1 border-b border-slate-700 focus-within:border-emerald-500 pb-1">
+                    <div className="flex-1 border-b border-slate-700 focus-within:border-indigo-500 pb-1">
                       <label className="block text-[10px] text-slate-400 uppercase">Phone</label>
                       <input
                         type="tel"
@@ -764,7 +914,7 @@ export default function Chat() {
                 {/* Save to Field */}
                 <div className="relative flex items-center gap-4">
                   <div className="w-5 shrink-0" />
-                  <div className="flex-1 border-b border-slate-700 focus-within:border-emerald-500 pb-1">
+                  <div className="flex-1 border-b border-slate-700 focus-within:border-indigo-500 pb-1">
                     <label className="block text-[10px] text-slate-400 uppercase">Save to</label>
                     <select
                       value={saveToOption}
@@ -784,7 +934,7 @@ export default function Chat() {
                 <button
                   type="submit"
                   disabled={newContactLoading}
-                  className="w-full py-3.5 bg-[#00a884] hover:bg-[#008f70] text-white font-semibold rounded-full shadow-lg transition-all active:scale-[0.98] text-sm disabled:opacity-50 cursor-pointer"
+                  className="w-full py-3.5 bg-gradient-to-r from-indigo-500 via-indigo-600 to-violet-600 hover:from-indigo-400 hover:to-violet-500 text-white font-semibold rounded-2xl shadow-lg shadow-indigo-600/25 transition-all active:scale-[0.98] text-sm disabled:opacity-50 cursor-pointer"
                 >
                   {newContactLoading ? 'Saving...' : 'Save'}
                 </button>
@@ -795,21 +945,38 @@ export default function Chat() {
       </div>
 
       {/* 2. CHAT MAIN WORKSPACE */}
-      <div className="flex-1 h-full flex flex-col bg-slate-950/20 relative">
+      <div className={`chat-panel h-full flex-col bg-slate-950/20 relative ${mobileView === 'sidebar' ? 'mobile-hidden' : ''}`}>
         {activeChat ? (
           <>
             {/* Active Chat Header */}
-            <div className="h-16 px-6 border-b border-slate-800 flex items-center justify-between bg-slate-900/30 backdrop-blur-md relative z-10">
-              <div className="flex items-center gap-3">
-                <div className="w-10 h-10 rounded-full bg-slate-950 overflow-hidden flex items-center justify-center border border-slate-800">
+            <div className="h-16 px-3 border-b border-slate-800 flex items-center justify-between bg-slate-900/30 backdrop-blur-md relative z-10">
+              <div className="flex items-center gap-2 min-w-0">
+                {/* Mobile Back Button */}
+                <button
+                  onClick={() => setMobileView('sidebar')}
+                  className="chat-back-btn p-2 hover:bg-slate-800 rounded-xl transition text-slate-400 hover:text-slate-100 cursor-pointer shrink-0"
+                  title="Back"
+                >
+                  <ArrowLeft className="w-4 h-4" />
+                </button>
+
+                <div 
+                  onClick={() => setAvatarMenuChat(activeChat)}
+                  className="w-9 h-9 md:w-10 md:h-10 rounded-full bg-slate-950 overflow-hidden flex items-center justify-center border border-slate-800 shrink-0 cursor-pointer hover:ring-2 hover:ring-rose-500/60 hover:ring-offset-1 hover:ring-offset-slate-900 transition-all"
+                  title="View Profile / Remove"
+                >
                   {getChatNameAndImage(activeChat).image ? (
                     <img src={`${BACKEND_URL}${getChatNameAndImage(activeChat).image}`} alt="" className="w-full h-full object-cover" />
                   ) : (
                     <User className="w-5 h-5 text-slate-550" />
                   )}
                 </div>
-                <div>
-                  <h2 className="text-sm font-semibold">{getChatNameAndImage(activeChat).name}</h2>
+                <div 
+                  onClick={() => setAvatarMenuChat(activeChat)}
+                  className="min-w-0 cursor-pointer hover:opacity-85 transition"
+                  title="View Profile / Remove"
+                >
+                  <h2 className="text-sm font-semibold truncate">{getChatNameAndImage(activeChat).name}</h2>
                   
                   {/* Status subtitle */}
                   {activeChat.type === 'one_to_one' ? (
@@ -821,13 +988,13 @@ export default function Chat() {
                       )}
                     </span>
                   ) : (
-                    <span className="text-[10px] text-slate-400">Group Chat ({activeChat.members.length} members)</span>
+                    <span className="text-[10px] text-slate-400">Group ({activeChat.members.length})</span>
                   )}
                 </div>
               </div>
 
-              {/* Action Buttons */}
-              <div className="flex items-center gap-2">
+              {/* Action Buttons — always visible */}
+              <div className="flex items-center gap-1 shrink-0">
                 <button
                   onClick={() => startCall(activeChat.id, 'audio')}
                   title="Voice Call"
@@ -842,11 +1009,18 @@ export default function Chat() {
                 >
                   <VideoIcon className="w-4 h-4" />
                 </button>
+                <button
+                  onClick={() => handleDeleteChat(activeChat)}
+                  title={activeChat.type === 'one_to_one' ? 'Remove Contact & Delete Chat' : 'Leave Group'}
+                  className="p-2 hover:bg-rose-500/20 text-slate-400 hover:text-rose-400 rounded-xl transition cursor-pointer"
+                >
+                  <Trash2 className="w-4 h-4" />
+                </button>
               </div>
             </div>
 
             {/* Message History Feed */}
-            <div className="flex-1 overflow-y-auto p-6 space-y-4 bg-slate-950/40 relative">
+            <div className="chat-messages-feed flex-1 overflow-y-auto p-3 md:p-6 space-y-4 bg-slate-950/40 relative" style={{minHeight: 0}}>
               {messages.map((msg, index) => {
                 const isMe = msg.sender_id === user?.id
                 const hasAttachment = msg.attachments && msg.attachments.length > 0
@@ -858,9 +1032,11 @@ export default function Chat() {
                 return (
                   <div
                     key={msg.id || index}
-                    className={`flex flex-col group relative ${isMe ? 'items-end' : 'items-start'}`}
+                    className={`flex w-full group relative ${isMe ? 'justify-end' : 'justify-start'}`}
                   >
                     
+                    {/* Inner column: flex-col so username sits above bubble */}
+                    <div className={`flex flex-col ${isMe ? 'items-end' : 'items-start'} max-w-[85%] sm:max-w-[75%]`}>
                     {/* Optional Sender Username (for groups) */}
                     {activeChat.type === 'group' && !isMe && (
                       <span className="text-[10px] text-indigo-400 font-semibold mb-1 ml-2">
@@ -868,10 +1044,10 @@ export default function Chat() {
                       </span>
                     )}
 
-                    {/* Message Bubble container */}
-                    <div className="flex items-end gap-2 max-w-[70%]">
+                    {/* Message Bubble container - flex-row-reverse so outgoing bubbles hug the right edge */}
+                    <div className={`flex items-end gap-1.5 ${isMe ? 'flex-row-reverse' : 'flex-row'}`}>
                       
-                      <div className={`p-3 rounded-2xl shadow-md transition relative hover:shadow-lg ${isMe ? 'bg-indigo-600 text-slate-50 rounded-br-none' : 'bg-slate-900 border border-slate-800 text-slate-100 rounded-bl-none'}`}>
+                      <div className={`p-3 rounded-2xl shadow-md transition relative hover:shadow-lg ${isMe ? 'bg-indigo-600 text-slate-50 rounded-br-xs' : 'bg-slate-900 border border-slate-800 text-slate-100 rounded-bl-xs'}`}>
                         
                         {/* Reply Context Header */}
                         {msg.reply_to && (
@@ -895,8 +1071,8 @@ export default function Chat() {
                         )}
 
                         {msg.message_type === 'voice' && (
-                          <div className="mb-2 p-1 bg-black/10 rounded-lg flex items-center gap-2">
-                            <audio src={`${BACKEND_URL}${msg.message}`} controls className="w-52 h-8" />
+                          <div className="my-1 py-1 px-1 bg-slate-900/60 rounded-xl flex items-center gap-2 border border-slate-700/40">
+                            <audio src={`${BACKEND_URL}${msg.message}`} controls className="w-48 sm:w-60 h-8 accent-indigo-500" />
                           </div>
                         )}
 
@@ -913,7 +1089,7 @@ export default function Chat() {
 
                         {/* Message Text (if text or emoji, or as description for files) */}
                         {msg.message_type === 'text' || msg.message_type === 'emoji' ? (
-                          <p className="text-sm whitespace-pre-wrap leading-relaxed break-all">{msg.message}</p>
+                          <p className="text-sm whitespace-pre-wrap leading-relaxed break-words">{msg.message}</p>
                         ) : null}
 
                         {/* Footer (Edited badge, Checkmarks, Timestamp) */}
@@ -936,8 +1112,8 @@ export default function Chat() {
                         </div>
                       </div>
 
-                      {/* Bubble Hover Action Toolbar */}
-                      <div className="opacity-0 group-hover:opacity-100 flex items-center gap-1 transition-opacity self-center">
+                      {/* Bubble Hover Action Toolbar (desktop only to prevent mobile layout shift) */}
+                      <div className="hidden md:flex opacity-0 group-hover:opacity-100 items-center gap-1 transition-opacity self-center shrink-0">
                         <button
                           onClick={() => setReplyMessage(msg)}
                           title="Reply"
@@ -972,6 +1148,7 @@ export default function Chat() {
                         )}
                       </div>
                     </div>
+                    </div>
                   </div>
                 )
               })}
@@ -992,7 +1169,7 @@ export default function Chat() {
             )}
 
             {/* Input Action Controls Footer */}
-            <div className="px-4 py-3 border-t border-slate-800 bg-slate-900/50 flex flex-col gap-2">
+            <div className="px-2 sm:px-4 py-2 sm:py-3 border-t border-slate-800 bg-slate-900/50 flex flex-col gap-2 shrink-0">
               
               {/* Emoji Picker Row */}
               {showEmojiPicker && (
@@ -1013,13 +1190,13 @@ export default function Chat() {
               )}
 
               {/* Main Input Controls Layout */}
-              <form onSubmit={handleSendMessage} className="flex items-center gap-3">
+              <form onSubmit={handleSendMessage} className="chat-input-form flex items-center gap-1.5 sm:gap-2.5 w-full">
                 {/* Paperclip File Upload */}
                 <button
                   type="button"
                   onClick={() => fileInputRef.current?.click()}
                   title="Attach File"
-                  className="p-2.5 hover:bg-slate-800 rounded-xl text-slate-400 hover:text-slate-100 transition cursor-pointer"
+                  className="shrink-0 p-2 sm:p-2.5 hover:bg-slate-800 rounded-xl text-slate-400 hover:text-slate-100 transition cursor-pointer"
                 >
                   <Paperclip className="w-4.5 h-4.5" />
                   <input
@@ -1035,52 +1212,88 @@ export default function Chat() {
                   type="button"
                   onClick={() => setShowEmojiPicker(!showEmojiPicker)}
                   title="Emoji Picker"
-                  className="p-2.5 hover:bg-slate-800 rounded-xl text-slate-400 hover:text-slate-100 transition cursor-pointer"
+                  className="shrink-0 p-2 sm:p-2.5 hover:bg-slate-800 rounded-xl text-slate-400 hover:text-slate-100 transition cursor-pointer"
                 >
                   <Smile className="w-4.5 h-4.5" />
                 </button>
 
-                {/* TextInput */}
-                <input
-                  type="text"
-                  value={text}
-                  onChange={handleTextChange}
-                  placeholder={editMessageId ? "Edit message..." : "Type a message..."}
-                  className="flex-1 bg-slate-950/50 border border-slate-800 focus:outline-none focus:border-indigo-500 px-4 py-2.5 rounded-xl text-sm"
-                />
-
-                {/* Voice Recorder Indicator / Recorder triggers */}
+                {/* TextInput or Voice Recording Bar */}
                 {isRecording ? (
-                  <div className="flex items-center gap-3 bg-rose-500/10 border border-rose-500/20 px-3 py-1.5 rounded-xl">
-                    <span className="w-2.5 h-2.5 rounded-full bg-rose-500 animate-ping" />
-                    <span className="text-xs text-rose-400 font-semibold font-mono">{formatVoiceTime(recordingSeconds)}</span>
-                    <button
-                      type="button"
-                      onClick={stopVoiceRecording}
-                      className="p-1 hover:bg-rose-500/20 rounded-full text-rose-400 cursor-pointer"
-                    >
-                      <X className="w-4.5 h-4.5" />
-                    </button>
+                  <div className="flex-1 min-w-0 flex items-center justify-between bg-rose-500/10 border border-rose-500/25 px-3 py-1.5 rounded-xl animate-in fade-in duration-150">
+                    <div className="flex items-center gap-2 min-w-0">
+                      <span className="w-2.5 h-2.5 rounded-full bg-rose-500 animate-ping shrink-0" />
+                      <span className="text-xs text-rose-400 font-bold font-mono tracking-wider shrink-0">
+                        {formatVoiceTime(recordingSeconds)}
+                      </span>
+                      <span className="text-xs text-slate-400 italic hidden sm:inline truncate">
+                        Recording...
+                      </span>
+                    </div>
+
+                    <div className="flex items-center gap-1.5 shrink-0">
+                      {/* Cancel / Discard button */}
+                      <button
+                        type="button"
+                        onClick={cancelVoiceRecording}
+                        className="px-2 py-1 hover:bg-rose-500/20 text-rose-400 hover:text-rose-300 rounded-lg transition cursor-pointer flex items-center gap-1 text-xs"
+                        title="Cancel and discard voice note"
+                      >
+                        <Trash2 className="w-3.5 h-3.5" />
+                        <span className="hidden sm:inline">Cancel</span>
+                      </button>
+
+                      {/* Send Voice Note button */}
+                      <button
+                        type="button"
+                        onClick={sendVoiceRecording}
+                        className="px-2.5 py-1.5 bg-emerald-600 hover:bg-emerald-500 text-white rounded-lg transition active:scale-95 cursor-pointer flex items-center gap-1 text-xs font-semibold shadow-md shadow-emerald-950/40"
+                        title="Send voice note"
+                      >
+                        <Send className="w-3.5 h-3.5" />
+                        <span>Send</span>
+                      </button>
+                    </div>
+                  </div>
+                ) : isUploadingVoice ? (
+                  <div className="flex-1 min-w-0 flex items-center gap-2 bg-indigo-500/10 border border-indigo-500/20 px-3 py-2 rounded-xl animate-pulse">
+                    <span className="w-2 h-2 rounded-full bg-indigo-400 shrink-0" />
+                    <span className="text-xs text-indigo-300 font-medium truncate">Sending voice note...</span>
                   </div>
                 ) : (
-                  <button
-                    type="button"
-                    onClick={startVoiceRecording}
-                    title="Record Voice Note"
-                    className="p-2.5 hover:bg-slate-850 rounded-xl text-slate-400 hover:text-slate-100 transition cursor-pointer"
-                  >
-                    <Mic className="w-4.5 h-4.5" />
-                  </button>
-                )}
+                  <>
+                    <input
+                      type="text"
+                      value={text}
+                      onChange={handleTextChange}
+                      onFocus={() => {
+                        setTimeout(() => {
+                          messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' })
+                        }, 250)
+                      }}
+                      placeholder={editMessageId ? "Edit message..." : "Type a message..."}
+                      className="min-w-0 flex-1 bg-slate-950/50 border border-slate-800 focus:outline-none focus:border-indigo-500 px-3 sm:px-4 py-2 sm:py-2.5 rounded-xl text-base sm:text-sm"
+                    />
 
-                {/* Send Button */}
-                <button
-                  type="submit"
-                  title="Send Message"
-                  className="p-2.5 bg-indigo-500 hover:bg-indigo-600 text-white rounded-xl transition cursor-pointer shadow-lg shadow-indigo-500/20"
-                >
-                  <Send className="w-4.5 h-4.5" />
-                </button>
+                    {/* Mic Trigger */}
+                    <button
+                      type="button"
+                      onClick={startVoiceRecording}
+                      title="Record Voice Note"
+                      className="shrink-0 p-2 sm:p-2.5 bg-slate-850/80 hover:bg-indigo-600/20 text-indigo-400 hover:text-indigo-300 border border-slate-750/70 hover:border-indigo-500/40 rounded-xl transition cursor-pointer shadow-sm flex items-center justify-center"
+                    >
+                      <Mic className="w-4.5 h-4.5" />
+                    </button>
+
+                    {/* Send Button */}
+                    <button
+                      type="submit"
+                      title="Send Message"
+                      className="shrink-0 p-2 sm:p-2.5 bg-indigo-500 hover:bg-indigo-600 text-white rounded-xl transition cursor-pointer shadow-lg shadow-indigo-500/20 flex items-center justify-center"
+                    >
+                      <Send className="w-4.5 h-4.5" />
+                    </button>
+                  </>
+                )}
               </form>
             </div>
           </>
@@ -1305,6 +1518,148 @@ export default function Chat() {
           )}
         </div>
       )}
+
+      {/* PROFILE QUICK-VIEW & REMOVE MODAL */}
+      {avatarMenuChat && (() => {
+        const info = getChatNameAndImage(avatarMenuChat)
+        const isOneToOne = avatarMenuChat.type === 'one_to_one'
+
+        return (
+          <div 
+            className="fixed inset-0 z-50 bg-black/75 backdrop-blur-sm flex items-center justify-center p-4 animate-in fade-in duration-200"
+            onClick={() => setAvatarMenuChat(null)}
+          >
+            <div 
+              className="relative w-full max-w-sm bg-slate-900 border border-slate-800 rounded-3xl overflow-hidden shadow-2xl p-6 flex flex-col items-center animate-in zoom-in-95 duration-200"
+              onClick={(e) => e.stopPropagation()}
+            >
+              {/* Close Button */}
+              <button 
+                onClick={() => setAvatarMenuChat(null)}
+                className="absolute top-4 right-4 p-1.5 text-slate-400 hover:text-white bg-slate-800/80 hover:bg-slate-750 rounded-full transition cursor-pointer"
+                title="Close"
+              >
+                <X className="w-4 h-4" />
+              </button>
+
+              {/* Large Profile Avatar */}
+              <div className="relative group my-2">
+                <div className="w-24 h-24 sm:w-28 sm:h-28 rounded-full bg-slate-950 border-4 border-slate-800 shadow-2xl overflow-hidden flex items-center justify-center">
+                  {info.image ? (
+                    <img 
+                      src={`${BACKEND_URL}${info.image}`} 
+                      alt={info.name} 
+                      className="w-full h-full object-cover" 
+                    />
+                  ) : (
+                    <User className="w-12 h-12 sm:w-14 sm:h-14 text-slate-500" />
+                  )}
+                </div>
+                {info.isOnline && (
+                  <span 
+                    className="absolute bottom-1 right-2 w-4 h-4 bg-emerald-500 border-2 border-slate-900 rounded-full shadow-md" 
+                    title="Online"
+                  />
+                )}
+              </div>
+
+              {/* Name */}
+              <h3 className="text-xl font-bold text-white mt-2 font-outfit text-center truncate max-w-[260px]">
+                {info.name}
+              </h3>
+              
+              {/* Status */}
+              <div className="flex items-center gap-1.5 mt-1">
+                {isOneToOne ? (
+                  info.isOnline ? (
+                    <span className="text-xs text-emerald-400 font-medium flex items-center gap-1.5">
+                      <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
+                      Online
+                    </span>
+                  ) : (
+                    <span className="text-xs text-slate-400">Offline</span>
+                  )
+                ) : (
+                  <span className="text-xs text-slate-400">
+                    Group • {avatarMenuChat.members?.length || 0} members
+                  </span>
+                )}
+              </div>
+
+              {info.phone && (
+                <p className="text-xs text-slate-400 mt-1 font-mono">{info.phone}</p>
+              )}
+
+              {info.about && (
+                <p className="text-xs text-slate-300 text-center italic mt-2 px-3 py-1.5 bg-slate-950/50 rounded-xl border border-slate-800/60 max-w-full truncate">
+                  "{info.about}"
+                </p>
+              )}
+
+              {/* Action Buttons Row */}
+              <div className="grid grid-cols-3 gap-2 w-full mt-5">
+                <button
+                  onClick={() => {
+                    if (avatarMenuChat.id) {
+                      setActiveChat(avatarMenuChat)
+                      setMobileView('chat')
+                    } else if (avatarMenuChat.targetContact) {
+                      startDirectChat(avatarMenuChat.targetContact.id)
+                    }
+                    setAvatarMenuChat(null)
+                  }}
+                  className="py-2.5 px-3 bg-indigo-600/15 hover:bg-indigo-600/25 border border-indigo-500/20 text-indigo-300 rounded-2xl flex flex-col items-center gap-1.5 text-xs font-medium transition active:scale-95 cursor-pointer"
+                >
+                  <MessageSquare className="w-4 h-4 text-indigo-400" />
+                  <span>Message</span>
+                </button>
+
+                <button
+                  onClick={() => {
+                    const chatId = avatarMenuChat.id
+                    setAvatarMenuChat(null)
+                    if (chatId) startCall(chatId, 'audio')
+                  }}
+                  disabled={!avatarMenuChat.id}
+                  className="py-2.5 px-3 bg-emerald-600/15 hover:bg-emerald-600/25 border border-emerald-500/20 text-emerald-300 rounded-2xl flex flex-col items-center gap-1.5 text-xs font-medium transition active:scale-95 cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed"
+                >
+                  <Phone className="w-4 h-4 text-emerald-400" />
+                  <span>Audio</span>
+                </button>
+
+                <button
+                  onClick={() => {
+                    const chatId = avatarMenuChat.id
+                    setAvatarMenuChat(null)
+                    if (chatId) startCall(chatId, 'video')
+                  }}
+                  disabled={!avatarMenuChat.id}
+                  className="py-2.5 px-3 bg-violet-600/15 hover:bg-violet-600/25 border border-violet-500/20 text-violet-300 rounded-2xl flex flex-col items-center gap-1.5 text-xs font-medium transition active:scale-95 cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed"
+                >
+                  <VideoIcon className="w-4 h-4 text-violet-400" />
+                  <span>Video</span>
+                </button>
+              </div>
+
+              {/* Danger Zone: Remove / Delete button */}
+              {avatarMenuChat.id && (
+                <div className="w-full mt-4 pt-4 border-t border-slate-800/80">
+                  <button
+                    onClick={() => handleDeleteChat(avatarMenuChat)}
+                    className="w-full py-3 px-4 bg-rose-500/15 hover:bg-rose-500/25 border border-rose-500/30 text-rose-300 hover:text-rose-200 rounded-2xl flex items-center justify-center gap-2 text-sm font-semibold transition active:scale-95 cursor-pointer group shadow-lg shadow-rose-950/20"
+                  >
+                    <Trash2 className="w-4 h-4 text-rose-400 group-hover:scale-110 transition-transform" />
+                    <span>
+                      {isOneToOne ? `Remove ${info.name}` : 'Leave & Remove Group'}
+                    </span>
+                  </button>
+                </div>
+              )}
+            </div>
+          </div>
+        )
+      })()}
     </div>
   )
 }
+

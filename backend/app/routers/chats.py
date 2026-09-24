@@ -46,3 +46,12 @@ def create_chat(
             return c
             
     raise HTTPException(status_code=500, detail="Failed to retrieve created chat")
+
+@router.delete("/{chat_id}")
+def delete_chat(
+    chat_id: int,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    return chat_service.delete_chat_for_user(db, chat_id, current_user.id)
+

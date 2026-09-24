@@ -14,6 +14,29 @@ class OTPVerify(BaseModel):
     phone_number: str
     otp: str
 
+# ── Phone and Email OTP flow ──────────────────────────────────────────────────
+
+class CheckPhoneRequest(BaseModel):
+    phone_number: str
+
+class CheckPhoneResponse(BaseModel):
+    exists: bool
+    phone_number: str
+    username: Optional[str] = None
+    access_token: Optional[str] = None
+    token_type: Optional[str] = "bearer"
+
+class SendOTPRequest(BaseModel):
+    email: EmailStr
+    phone_number: Optional[str] = None
+
+class VerifyOTPRequest(BaseModel):
+    email: EmailStr
+    otp: str = Field(..., min_length=6, max_length=6, pattern=r"^\d{6}$")
+    phone_number: Optional[str] = None
+
+# ─────────────────────────────────────────────────────────────────────────────
+
 class UserLogin(BaseModel):
     phone_number: str
 

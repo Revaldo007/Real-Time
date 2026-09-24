@@ -110,8 +110,10 @@ export const ChatProvider = ({ children }) => {
       return
     }
 
+    // Route WebSocket through Vite's /ws proxy so it works on both HTTP and HTTPS.
+    // Vite proxy handles TLS termination: wss://host:5173/ws -> ws://127.0.0.1:8000/ws
     const wsProtocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:'
-    const wsUrl = `${wsProtocol}//${window.location.hostname}:8000/ws?token=${token}`
+    const wsUrl = `${wsProtocol}//${window.location.host}/ws?token=${token}`
     const ws = new WebSocket(wsUrl)
     socketRef.current = ws
 
