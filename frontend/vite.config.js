@@ -1,19 +1,18 @@
 import react from '@vitejs/plugin-react'
 import { defineConfig } from 'vite'
 import tailwindcss from '@tailwindcss/vite'
-import basicSsl from '@vitejs/plugin-basic-ssl'
+import mkcert from 'vite-plugin-mkcert'
 
 // https://vite.dev/config/
 export default defineConfig({
   plugins: [
     react(),
     tailwindcss(),
-    basicSsl(),  // Enables HTTPS so mobile browsers allow mic/camera (getUserMedia)
+    mkcert(),
   ],
   server: {
     host: true,
     port: 5173,
-    https: true,  // Required: mobile Chrome/Safari block mic & camera over HTTP
     proxy: {
       // Proxy all backend API routes through Vite so they work on HTTPS
       // (browsers block HTTP requests from HTTPS pages = "mixed content")
