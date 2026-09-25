@@ -44,7 +44,12 @@ export const AuthProvider = ({ children }) => {
         } catch (err) {
           // If user not found on login, try registering automatically (WhatsApp-like onboarding)
           if (err.response?.status === 401 || err.response?.status === 404) {
-            await authAPI.register(phoneNumber, `User_${phoneNumber.slice(-4)}`)
+            try {
+              const cleanDigits = phoneNumber.replace(/\D/g, '')
+              await authAPI.register(phoneNumber, `User_${cleanDigits.slice(-4) || 'user'}`)
+            } catch (regErr) {
+              console.warn('Auto-register notice:', regErr)
+            }
             res = await authAPI.login(phoneNumber)
           } else {
             throw err

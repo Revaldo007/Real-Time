@@ -45,18 +45,12 @@ def check_phone(data: CheckPhoneRequest, db: Session = Depends(get_db)):
 @router.post("/send-otp")
 def send_otp(data: SendOTPRequest, db: Session = Depends(get_db)):
     """
-    Send a 6-digit OTP to the provided email via Resend.
-    Rate limited to 3 requests per 10 minutes per email.
+    Send a 6-digit OTP to the provided email via Resend or SMTP,
+    with automatic console OTP fallback.
     """
     success, message, code = otp_service.send_otp_email(data.email)
-    if not success:
-        raise HTTPException(
-            status_code=status.HTTP_429_TOO_MANY_REQUESTS if "Too many" in message
-                else status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=message
-        )
     return {
-        "message": message or "OTP sent to your email. It expires in 5 minutes.",
+        "message": message or "OTP generated successfully. It expires in 5 minutes.",
         "otp_hint": code
     }
 

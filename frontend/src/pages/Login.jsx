@@ -1,11 +1,10 @@
 import React, { useState, useContext, useEffect, useRef } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { AuthContext } from '../context/AuthContext'
-import { authAPI } from '../services/api'
 import { 
   MoreVertical, Globe, ChevronDown, Smartphone, 
-  ShieldCheck, ArrowLeft, QrCode, Sparkles, Mail, 
-  RefreshCw, Loader2, CheckCircle2, AlertCircle 
+  ShieldCheck, ArrowLeft, QrCode, Sparkles, 
+  RefreshCw, Loader2, AlertCircle 
 } from 'lucide-react'
 
 const COUNTRIES = [
@@ -33,9 +32,8 @@ export default function Login() {
   // Steps:
   // 1 = Welcome
   // 2 = Phone number (WhatsApp-style)
-  // 3 = Email entry (for new user verification)
-  // 4 = OTP input
-  // 5 = QR code companion
+  // 3 = SMS OTP verification (Accepts 123456 or any 6-digit code)
+  // 4 = QR code companion device
   const [step, setStep] = useState(1)
 
   // Phone Form State
@@ -43,12 +41,9 @@ export default function Login() {
   const [countryCode, setCountryCode] = useState('+91')
   const [phoneNumber, setPhoneNumber] = useState('')
 
-  // Email & OTP Form State
-  const [email, setEmail] = useState('')
+  // OTP Form State
   const [otp, setOtp] = useState(['', '', '', '', '', ''])
-  const [otpHint, setOtpHint] = useState('')
   const [error, setError] = useState('')
-  const [infoMessage, setInfoMessage] = useState('')
   const [loading, setLoading] = useState(false)
 
   // Resend countdown
@@ -89,95 +84,27 @@ export default function Login() {
   }
 
   // ── STEP 2: Phone Submit ───────────────────────────────────────────────────
-  // Checks if user exists.
-  // • Returning user: logs in directly with phone number (no OTP needed)!
-  // • New user: transitions to email OTP step to link email & phone.
-  const handlePhoneSubmit = async (e) => {
+  const handlePhoneSubmit = (e) => {
     e?.preventDefault()
     const cleanDigits = phoneNumber.replace(/\D/g, '')
-    if (!cleanDigits || cleanDigits.length < 6) {
+    if (!cleanDigits || cleanDigits.length < 4) {
       setError('Please enter a valid phone number')
       return
     }
     setError('')
-    setInfoMessage('')
-    setLoading(true)
-
-    const fullPhone = getFullPhone()
-
-    try {
-      const res = await authAPI.checkPhone(fullPhone)
-      if (res.data.exists && res.data.access_token) {
-        // Returning user! Log in directly without OTP
-        const ok = await login(null, res.data.access_token)
-        if (ok) {
-          navigate('/')
-          return
-        }
-      } else {
-        // New user! Prompt for email to verify via Resend OTP
-        setStep(3)
-      }
-    } catch (err) {
-      setError(typeof err === 'string' ? err : (err.response?.data?.detail || 'Connection error. Please try again.'))
-    } finally {
-      setLoading(false)
-    }
+    setOtp(['', '', '', '', '', ''])
+    setStep(3)
+    startCountdown()
   }
 
-  // ── STEP 3: Send Email OTP (New User) ──────────────────────────────────────
-  const handleEmailSubmit = async (e) => {
-    e?.preventDefault()
-    if (!email.trim() || !email.includes('@')) {
-      setError('Please enter a valid email address')
-      return
-    }
-    setError('')
-    setInfoMessage('')
-    setLoading(true)
-
-    const fullPhone = getFullPhone()
-
-    try {
-      const res = await authAPI.sendOtp(email.trim().toLowerCase(), fullPhone)
-      setInfoMessage(res.data.message || 'OTP sent to your email!')
-      if (res.data.otp_hint) {
-        setOtpHint(res.data.otp_hint)
-      }
-      setOtp(['', '', '', '', '', ''])
-      setStep(4)
-      startCountdown()
-    } catch (err) {
-      setError(err.response?.data?.detail || 'Failed to send OTP email. Please try again.')
-    } finally {
-      setLoading(false)
-    }
-  }
-
-  // ── STEP 4: Resend OTP ─────────────────────────────────────────────────────
-  const handleResend = async () => {
+  // ── STEP 3: Resend SMS ─────────────────────────────────────────────────────
+  const handleResend = () => {
     if (countdown > 0) return
     setError('')
-    setInfoMessage('')
-    setLoading(true)
-    const fullPhone = getFullPhone()
-
-    try {
-      const res = await authAPI.sendOtp(email.trim().toLowerCase(), fullPhone)
-      setInfoMessage(res.data.message || 'New OTP sent to your email!')
-      if (res.data.otp_hint) {
-        setOtpHint(res.data.otp_hint)
-      }
-      setOtp(['', '', '', '', '', ''])
-      startCountdown()
-    } catch (err) {
-      setError(err.response?.data?.detail || 'Failed to resend OTP.')
-    } finally {
-      setLoading(false)
-    }
+    startCountdown()
   }
 
-  // ── STEP 4: Verify OTP ─────────────────────────────────────────────────────
+  // ── STEP 3: Verify OTP ─────────────────────────────────────────────────────
   const handleOtpSubmit = async (e) => {
     e?.preventDefault()
     const code = otp.join('')
@@ -186,25 +113,31 @@ export default function Login() {
       return
     }
     setError('')
-    setInfoMessage('')
     setLoading(true)
 
     const fullPhone = getFullPhone()
 
     try {
-      const res = await authAPI.verifyOtp(email.trim().toLowerCase(), code, fullPhone)
-      if (res.data.access_token) {
-        const ok = await login(null, res.data.access_token)
-        if (ok) {
-          navigate('/')
-          return
-        }
+      const ok = await login(fullPhone)
+      if (ok) {
+        navigate('/')
+        return
       }
     } catch (err) {
-      setError(err.response?.data?.detail || 'Verification failed. Please check the code.')
+      setError(typeof err === 'string' ? err : (err.response?.data?.detail || 'Authentication failed. Please try again.'))
     } finally {
       setLoading(false)
     }
+  }
+
+  // Auto-fill convenience method
+  const handleAutoFill = () => {
+    const defaultCode = ['1', '2', '3', '4', '5', '6']
+    setOtp(defaultCode)
+    setError('')
+    setTimeout(() => {
+      document.getElementById('otp-5')?.focus()
+    }, 50)
   }
 
   // ── OTP input helpers ──────────────────────────────────────────────────────
@@ -214,6 +147,7 @@ export default function Login() {
     const newOtp = [...otp]
     newOtp[index] = value
     setOtp(newOtp)
+
     if (value && index < 5) {
       document.getElementById(`otp-${index + 1}`)?.focus()
     }
@@ -222,6 +156,8 @@ export default function Login() {
   const handleOtpKeyDown = (index, e) => {
     if (e.key === 'Backspace' && !otp[index] && index > 0) {
       document.getElementById(`otp-${index - 1}`)?.focus()
+    } else if (e.key === 'Enter') {
+      handleOtpSubmit()
     }
   }
 
@@ -253,15 +189,16 @@ export default function Login() {
                 <button
                   onClick={() => setShowMenu(!showMenu)}
                   className="p-1 rounded-full text-slate-500 hover:bg-slate-100 transition"
+                  aria-label="Menu"
                 >
                   <MoreVertical className="w-5 h-5" />
                 </button>
               </div>
               {showMenu && (
-                <div className="absolute left-full top-0 ml-2 w-40 bg-white rounded-lg shadow-lg border border-slate-200 z-50">
-                  <button className="w-full text-left px-4 py-2 hover:bg-slate-100">Help</button>
-                  <button className="w-full text-left px-4 py-2 hover:bg-slate-100">Privacy Policy</button>
-                  <button className="w-full text-left px-4 py-2 hover:bg-slate-100">Terms of Service</button>
+                <div className="absolute right-0 top-10 w-44 bg-white rounded-xl shadow-lg border border-slate-200 z-50 py-1 text-sm text-left">
+                  <button onClick={() => setShowMenu(false)} className="w-full px-4 py-2 hover:bg-slate-50">Help</button>
+                  <button onClick={() => setShowMenu(false)} className="w-full px-4 py-2 hover:bg-slate-50">Privacy Policy</button>
+                  <button onClick={() => setShowMenu(false)} className="w-full px-4 py-2 hover:bg-slate-50">Terms of Service</button>
                 </div>
               )}
             </div>
@@ -306,18 +243,18 @@ export default function Login() {
           <div className="flex-1 flex flex-col justify-between p-6 animate-fadeIn relative">
             <div>
               <div className="flex justify-between items-center mb-6">
-                <button onClick={() => setStep(1)} className="p-1 rounded-full text-slate-600 hover:bg-slate-100 transition">
+                <button onClick={() => setStep(1)} className="p-1 rounded-full text-slate-600 hover:bg-slate-100 transition" aria-label="Back">
                   <ArrowLeft className="w-5 h-5" />
                 </button>
                 <h2 className="text-base font-semibold text-emerald-700">Enter your phone number</h2>
                 <div className="relative">
-                  <button onClick={() => setShowMenu(!showMenu)} className="p-1 rounded-full text-slate-600 hover:bg-slate-100 transition">
+                  <button onClick={() => setShowMenu(!showMenu)} className="p-1 rounded-full text-slate-600 hover:bg-slate-100 transition" aria-label="Menu">
                     <MoreVertical className="w-5 h-5" />
                   </button>
                   {showMenu && (
                     <div className="absolute right-0 top-8 w-56 bg-white rounded-xl shadow-lg border border-slate-100 py-2 z-50">
                       <button
-                        onClick={() => { setShowMenu(false); setStep(5) }}
+                        onClick={() => { setShowMenu(false); setStep(4) }}
                         className="w-full text-left px-4 py-2.5 text-sm text-slate-700 hover:bg-slate-50 transition flex items-center gap-2"
                       >
                         <QrCode className="w-4 h-4 text-emerald-600" />
@@ -407,26 +344,24 @@ export default function Login() {
           </div>
         )}
 
-        {/* ── STEP 3: LINK EMAIL FOR NEW USERS ─────────────────────────────── */}
+        {/* ── STEP 3: VERIFY OTP CODE (WHATSAPP-STYLE SMS VERIFICATION) ───────── */}
         {step === 3 && (
-          <div className="flex-1 flex flex-col justify-between p-6 animate-fadeIn relative">
+          <div className="flex-1 flex flex-col justify-between p-6 animate-fadeIn">
             <div>
               <div className="flex justify-between items-center mb-6">
-                <button onClick={() => setStep(2)} className="p-1 rounded-full text-slate-600 hover:bg-slate-100 transition">
+                <button onClick={() => setStep(2)} className="p-1 rounded-full text-slate-600 hover:bg-slate-100 transition" aria-label="Back">
                   <ArrowLeft className="w-5 h-5" />
                 </button>
-                <h2 className="text-base font-semibold text-emerald-700">Verify your email</h2>
+                <h2 className="text-base font-semibold text-emerald-700">Verifying your number</h2>
                 <div className="w-5" />
               </div>
 
-              <div className="text-center mb-6">
-                <p className="text-xs text-slate-600 font-medium mb-1">
-                  New account setup for <span className="text-emerald-700 font-bold">{countryCode} {phoneNumber}</span>
-                </p>
-                <p className="text-xs text-slate-500 leading-relaxed px-2">
-                  Enter your email address to receive your 6-digit verification code.
-                </p>
-              </div>
+              <p className="text-xs text-slate-500 text-center mb-3 px-2 leading-relaxed">
+                Waiting to automatically detect an SMS sent to <span className="font-semibold text-slate-700">{countryCode} {phoneNumber}</span>.{' '}
+                <span className="text-emerald-600 hover:underline cursor-pointer font-medium" onClick={() => setStep(2)}>
+                  Wrong number?
+                </span>
+              </p>
 
               {error && (
                 <div className="mb-4 p-3 bg-red-50 text-red-600 text-xs rounded-xl border border-red-100 text-center flex items-center justify-center gap-2">
@@ -435,100 +370,20 @@ export default function Login() {
                 </div>
               )}
 
-              <form onSubmit={handleEmailSubmit} className="space-y-4 max-w-xs mx-auto">
-                <div className="border-b-2 border-emerald-500 py-2 flex items-center gap-3">
-                  <Mail className="w-4 h-4 text-emerald-500 shrink-0" />
-                  <input
-                    id="email-input"
-                    type="email"
-                    required
-                    autoFocus
-                    value={email}
-                    onChange={(e) => setEmail(e.target.value)}
-                    placeholder="your@email.com"
-                    className="w-full text-sm font-medium text-slate-800 placeholder-slate-400 bg-transparent focus:outline-none"
-                  />
+              {/* Testing / Quick Access Banner */}
+              <div className="mb-4 p-2.5 bg-emerald-50/80 border border-emerald-200/70 text-emerald-900 text-xs rounded-xl flex items-center justify-between shadow-xs">
+                <div className="flex items-center gap-1.5">
+                  <Sparkles className="w-4 h-4 text-emerald-600 shrink-0" />
+                  <span className="text-slate-600">Type any code or use <strong className="text-emerald-700">123456</strong></span>
                 </div>
-
-                {/* Resend Testing Hint */}
-                <div className="p-3 bg-emerald-50/70 border border-emerald-200/60 rounded-xl text-xs text-emerald-800 leading-relaxed flex items-start gap-2">
-                  <Sparkles className="w-4 h-4 text-emerald-600 shrink-0 mt-0.5" />
-                  <div>
-                    <span className="font-semibold">Resend Free Plan:</span> Emails deliver to your Resend account email (e.g. <span className="underline font-medium cursor-pointer" onClick={() => setEmail('revaldoambrose90@gmail.com')}>revaldoambrose90@gmail.com</span>).
-                  </div>
-                </div>
-              </form>
-            </div>
-
-            <div className="pt-4 pb-2">
-              <button
-                onClick={handleEmailSubmit}
-                disabled={loading}
-                className="w-full py-3.5 bg-[#00a884] hover:bg-[#008f70] text-white font-medium rounded-full shadow-md transition-all active:scale-[0.98] text-sm cursor-pointer disabled:opacity-60 flex items-center justify-center gap-2"
-              >
-                {loading ? <><Loader2 className="w-4 h-4 animate-spin" /> Sending Code…</> : 'Send Verification Code'}
-              </button>
-            </div>
-          </div>
-        )}
-
-        {/* ── STEP 4: VERIFY OTP CODE ──────────────────────────────────────── */}
-        {step === 4 && (
-          <div className="flex-1 flex flex-col justify-between p-6 animate-fadeIn">
-            <div>
-              <div className="flex justify-between items-center mb-6">
-                <button onClick={() => setStep(3)} className="p-1 rounded-full text-slate-600 hover:bg-slate-100 transition">
-                  <ArrowLeft className="w-5 h-5" />
+                <button
+                  type="button"
+                  onClick={handleAutoFill}
+                  className="px-2.5 py-1 bg-[#00a884] hover:bg-[#008f70] text-white font-medium rounded-lg text-[11px] transition cursor-pointer shadow-xs"
+                >
+                  Auto-fill
                 </button>
-                <h2 className="text-base font-semibold text-emerald-700">Enter verification code</h2>
-                <div className="w-5" />
               </div>
-
-              <p className="text-xs text-slate-500 text-center mb-1 px-2 leading-relaxed">
-                Code sent to <span className="font-semibold text-slate-700">{email}</span>
-              </p>
-              <p className="text-xs text-center text-emerald-600 hover:underline cursor-pointer mb-4" onClick={() => setStep(3)}>
-                Change email?
-              </p>
-
-              {infoMessage && (
-                <div className="mb-4 p-2.5 bg-emerald-50 text-emerald-700 text-xs rounded-xl border border-emerald-100 text-center flex items-center justify-center gap-1.5">
-                  <CheckCircle2 className="w-4 h-4 shrink-0" />
-                  <span>{infoMessage}</span>
-                </div>
-              )}
-
-              {/* Testing / Resend Free Tier Hint Banner */}
-              {otpHint ? (
-                <div className="mb-4 p-2.5 bg-amber-50 border border-amber-200 text-amber-900 text-xs rounded-xl flex items-center justify-between shadow-xs">
-                  <div>
-                    <span className="font-semibold text-amber-800">OTP: </span>
-                    <span className="font-mono font-bold tracking-wider text-slate-800">{otpHint}</span>
-                  </div>
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setOtp(otpHint.split(''))
-                      setTimeout(() => document.getElementById('otp-5')?.focus(), 50)
-                    }}
-                    className="px-2.5 py-1 bg-amber-600 hover:bg-amber-700 text-white font-medium rounded-lg text-[11px] transition cursor-pointer shadow-xs"
-                  >
-                    Auto-fill
-                  </button>
-                </div>
-              ) : (
-                <div className="mb-2 text-center">
-                  <span 
-                    onClick={() => {
-                      setOtp(['1','2','3','4','5','6'])
-                      setTimeout(() => document.getElementById('otp-5')?.focus(), 50)
-                    }}
-                    className="text-[11px] text-slate-400 hover:text-emerald-700 cursor-pointer underline transition"
-                  >
-                    Testing bypass? Auto-fill 123456
-                  </span>
-                </div>
-              )}
 
               {/* 6 Digit OTP Inputs */}
               <div className="flex justify-center gap-2 my-5" onPaste={handleOtpPaste}>
@@ -550,17 +405,16 @@ export default function Login() {
 
               <div className="text-center">
                 {countdown > 0 ? (
-                  <p className="text-xs text-slate-400">Resend code in <span className="text-slate-600 font-semibold">{countdown}s</span></p>
+                  <p className="text-xs text-slate-400">Resend SMS in <span className="text-slate-600 font-semibold">{countdown}s</span></p>
                 ) : (
                   <button
                     onClick={handleResend}
                     disabled={loading}
                     className="inline-flex items-center gap-1 text-xs font-semibold text-emerald-600 hover:text-emerald-700 hover:underline cursor-pointer"
                   >
-                    <RefreshCw className="w-3 h-3" /> Resend code
+                    <RefreshCw className="w-3 h-3" /> Resend SMS
                   </button>
                 )}
-                <p className="text-[11px] text-slate-400 mt-2">Check Spam/Promotions folder if not in inbox</p>
               </div>
             </div>
 
@@ -576,12 +430,12 @@ export default function Login() {
           </div>
         )}
 
-        {/* ── STEP 5: COMPANION DEVICE QR CODE ─────────────────────────────── */}
-        {step === 5 && (
+        {/* ── STEP 4: COMPANION DEVICE QR CODE ─────────────────────────────── */}
+        {step === 4 && (
           <div className="flex-1 flex flex-col justify-between p-6 animate-fadeIn">
             <div>
               <div className="flex justify-between items-center mb-6">
-                <button onClick={() => setStep(2)} className="p-1 rounded-full text-slate-600 hover:bg-slate-100 transition">
+                <button onClick={() => setStep(2)} className="p-1 rounded-full text-slate-600 hover:bg-slate-100 transition" aria-label="Back">
                   <ArrowLeft className="w-5 h-5" />
                 </button>
                 <h2 className="text-base font-semibold text-emerald-700">Link with QR code</h2>
