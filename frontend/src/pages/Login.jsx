@@ -2,10 +2,11 @@ import React, { useState, useContext, useEffect, useRef } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { AuthContext } from '../context/AuthContext'
 import { 
-  MoreVertical, Globe, ChevronDown, Smartphone, 
-  ShieldCheck, ArrowLeft, QrCode, Sparkles, 
+  MoreVertical, Globe, ChevronDown, 
+  ArrowLeft, QrCode, Sparkles, 
   RefreshCw, Loader2, AlertCircle 
 } from 'lucide-react'
+import conversationGif from '../assets/Conversation.gif'
 
 const COUNTRIES = [
   { name: 'India', code: '+91' },
@@ -172,20 +173,28 @@ export default function Login() {
 
   // ── Render ─────────────────────────────────────────────────────────────────
   return (
-    <div className="relative min-h-screen w-screen flex items-center justify-center bg-[#eef7ef] overflow-hidden font-sans text-slate-800 selection:bg-emerald-200">
+    <div className="relative w-full h-full min-h-screen flex flex-col items-center justify-between bg-[#eef7ef] overflow-y-auto overflow-x-hidden p-3 sm:p-5 md:p-6 font-sans text-slate-800 selection:bg-emerald-200">
       {/* Decorative background shapes */}
       <div className="absolute top-12 left-1/4 w-0 h-0 border-l-[15px] border-l-transparent border-r-[15px] border-r-transparent border-b-[26px] border-b-emerald-200/60 rotate-45 pointer-events-none" />
       <div className="absolute bottom-20 left-10 w-0 h-0 border-l-[20px] border-l-transparent border-r-[20px] border-r-transparent border-b-[35px] border-b-emerald-200/50 -rotate-12 pointer-events-none" />
       <div className="absolute top-1/3 right-12 w-0 h-0 border-l-[18px] border-l-transparent border-r-[18px] border-r-transparent border-b-[32px] border-b-emerald-200/40 rotate-[130deg] pointer-events-none" />
 
+      {/* Page Header Title */}
+      <header className="relative z-10 text-center px-2 max-w-2xl mb-2 sm:mb-4 animate-fadeIn shrink-0">
+        <h1 className="text-base sm:text-xl md:text-2xl lg:text-3xl font-extrabold tracking-tight text-slate-800 leading-snug">
+          Real-Time Chat and Collaboration Platform with WebRTC Integration
+        </h1>
+        <div className="mt-1.5 sm:mt-2 mx-auto h-1 w-20 sm:w-28 bg-gradient-to-r from-emerald-400 via-[#00a884] to-teal-500 rounded-full shadow-xs" />
+      </header>
+
       {/* Main Container Card */}
-      <div className="relative z-10 w-full max-w-[400px] min-h-[640px] mx-4 bg-white rounded-3xl shadow-xl border border-slate-100 flex flex-col justify-between overflow-visible transition-all duration-300">
+      <div className="relative z-10 w-full max-w-[390px] min-h-[480px] sm:min-h-[530px] my-auto bg-white rounded-2xl sm:rounded-3xl shadow-xl border border-slate-100 flex flex-col justify-between overflow-visible transition-all duration-300">
 
         {/* ── STEP 1: WELCOME ─────────────────────────────────────────────── */}
         {step === 1 && (
-          <div className="flex-1 flex flex-col justify-between p-6 text-center animate-fadeIn">
+          <div className="flex-1 flex flex-col justify-between p-4 sm:p-6 text-center animate-fadeIn">
             <div className="relative">
-              <div className="flex justify-end items-center h-8">
+              <div className="flex justify-end items-center h-7 sm:h-8">
                 <button
                   onClick={() => setShowMenu(!showMenu)}
                   className="p-1 rounded-full text-slate-500 hover:bg-slate-100 transition"
@@ -195,7 +204,7 @@ export default function Login() {
                 </button>
               </div>
               {showMenu && (
-                <div className="absolute right-0 top-10 w-44 bg-white rounded-xl shadow-lg border border-slate-200 z-50 py-1 text-sm text-left">
+                <div className="absolute right-0 top-9 w-44 bg-white rounded-xl shadow-lg border border-slate-200 z-50 py-1 text-sm text-left">
                   <button onClick={() => setShowMenu(false)} className="w-full px-4 py-2 hover:bg-slate-50">Help</button>
                   <button onClick={() => setShowMenu(false)} className="w-full px-4 py-2 hover:bg-slate-50">Privacy Policy</button>
                   <button onClick={() => setShowMenu(false)} className="w-full px-4 py-2 hover:bg-slate-50">Terms of Service</button>
@@ -204,33 +213,30 @@ export default function Login() {
             </div>
 
             <div className="flex flex-col items-center my-auto px-2">
-              <div className="relative w-52 h-52 mb-8 flex items-center justify-center">
-                <div className="absolute inset-0 bg-emerald-50 rounded-full animate-pulse" />
-                <div className="relative z-10 w-44 h-44 rounded-full border-2 border-dashed border-emerald-400 flex items-center justify-center bg-white shadow-sm p-4">
-                  <div className="grid grid-cols-3 gap-3 text-emerald-500 opacity-80">
-                    <Smartphone className="w-6 h-6" />
-                    <ShieldCheck className="w-6 h-6" />
-                    <Globe className="w-6 h-6" />
-                    <Sparkles className="w-6 h-6 col-span-3 mx-auto" />
-                  </div>
-                </div>
+              <div className="relative w-36 h-36 sm:w-44 sm:h-44 mb-3 sm:mb-5 flex items-center justify-center">
+                <img
+                  src={conversationGif || '/Conversation.gif'}
+                  onError={(e) => { e.currentTarget.src = '/Conversation.gif' }}
+                  alt="Welcome to Rivo"
+                  className="w-full h-full object-contain select-none pointer-events-none"
+                />
               </div>
 
-              <h1 className="text-2xl font-bold text-slate-800 mb-4">Welcome to Rivo</h1>
-              <p className="text-xs text-slate-500 leading-relaxed px-4">
+              <h1 className="text-xl sm:text-2xl font-bold text-slate-800 mb-2 sm:mb-3">Welcome to Rivo</h1>
+              <p className="text-xs text-slate-500 leading-relaxed px-2 sm:px-4">
                 Read our <span className="text-emerald-600 hover:underline cursor-pointer">Privacy Policy</span>. Tap "Agree and continue" to accept the <span className="text-emerald-600 hover:underline cursor-pointer">Terms of Service</span>.
               </p>
 
-              <div className="mt-6 inline-flex items-center gap-2 px-3 py-1.5 bg-slate-50 border border-slate-200 rounded-full text-xs font-medium text-emerald-700 cursor-pointer hover:bg-slate-100 transition">
+              <div className="mt-3 sm:mt-5 inline-flex items-center gap-1.5 px-3 py-1 bg-slate-50 border border-slate-200 rounded-full text-xs font-medium text-emerald-700 cursor-pointer hover:bg-slate-100 transition">
                 <Globe className="w-3.5 h-3.5" />
                 <span>English</span>
               </div>
             </div>
 
-            <div className="pt-4 pb-2">
+            <div className="pt-3 pb-1 sm:pt-4 sm:pb-2">
               <button
                 onClick={() => setStep(2)}
-                className="w-full py-3.5 bg-[#00a884] hover:bg-[#008f70] text-white font-medium rounded-full shadow-md transition-all active:scale-[0.98] text-sm cursor-pointer"
+                className="w-full py-3 sm:py-3.5 bg-[#00a884] hover:bg-[#008f70] text-white font-medium rounded-full shadow-md transition-all active:scale-[0.98] text-sm cursor-pointer"
               >
                 Agree and continue
               </button>
@@ -240,7 +246,7 @@ export default function Login() {
 
         {/* ── STEP 2: ENTER PHONE NUMBER (WhatsApp Style) ──────────────────── */}
         {step === 2 && (
-          <div className="flex-1 flex flex-col justify-between p-6 animate-fadeIn relative">
+          <div className="flex-1 flex flex-col justify-between p-4 sm:p-6 animate-fadeIn relative">
             <div>
               <div className="flex justify-between items-center mb-6">
                 <button onClick={() => setStep(1)} className="p-1 rounded-full text-slate-600 hover:bg-slate-100 transition" aria-label="Back">
@@ -346,13 +352,13 @@ export default function Login() {
 
         {/* ── STEP 3: VERIFY OTP CODE (WHATSAPP-STYLE SMS VERIFICATION) ───────── */}
         {step === 3 && (
-          <div className="flex-1 flex flex-col justify-between p-6 animate-fadeIn">
+          <div className="flex-1 flex flex-col justify-between p-4 sm:p-6 animate-fadeIn">
             <div>
-              <div className="flex justify-between items-center mb-6">
+              <div className="flex justify-between items-center mb-4 sm:mb-6">
                 <button onClick={() => setStep(2)} className="p-1 rounded-full text-slate-600 hover:bg-slate-100 transition" aria-label="Back">
                   <ArrowLeft className="w-5 h-5" />
                 </button>
-                <h2 className="text-base font-semibold text-emerald-700">Verifying your number</h2>
+                <h2 className="text-sm sm:text-base font-semibold text-emerald-700">Verifying your number</h2>
                 <div className="w-5" />
               </div>
 
@@ -364,29 +370,29 @@ export default function Login() {
               </p>
 
               {error && (
-                <div className="mb-4 p-3 bg-red-50 text-red-600 text-xs rounded-xl border border-red-100 text-center flex items-center justify-center gap-2">
+                <div className="mb-3 p-2.5 bg-red-50 text-red-600 text-xs rounded-xl border border-red-100 text-center flex items-center justify-center gap-2">
                   <AlertCircle className="w-4 h-4 shrink-0" />
                   <span>{error}</span>
                 </div>
               )}
 
               {/* Testing / Quick Access Banner */}
-              <div className="mb-4 p-2.5 bg-emerald-50/80 border border-emerald-200/70 text-emerald-900 text-xs rounded-xl flex items-center justify-between shadow-xs">
+              <div className="mb-3 p-2 bg-emerald-50/80 border border-emerald-200/70 text-emerald-900 text-xs rounded-xl flex items-center justify-between shadow-xs">
                 <div className="flex items-center gap-1.5">
                   <Sparkles className="w-4 h-4 text-emerald-600 shrink-0" />
-                  <span className="text-slate-600">Type any code or use <strong className="text-emerald-700">123456</strong></span>
+                  <span className="text-slate-600 text-[11px] sm:text-xs">Type any code or use <strong className="text-emerald-700">123456</strong></span>
                 </div>
                 <button
                   type="button"
                   onClick={handleAutoFill}
-                  className="px-2.5 py-1 bg-[#00a884] hover:bg-[#008f70] text-white font-medium rounded-lg text-[11px] transition cursor-pointer shadow-xs"
+                  className="px-2 py-0.5 sm:px-2.5 sm:py-1 bg-[#00a884] hover:bg-[#008f70] text-white font-medium rounded-lg text-[11px] transition cursor-pointer shadow-xs"
                 >
                   Auto-fill
                 </button>
               </div>
 
               {/* 6 Digit OTP Inputs */}
-              <div className="flex justify-center gap-2 my-5" onPaste={handleOtpPaste}>
+              <div className="flex justify-center gap-1.5 sm:gap-2 my-3 sm:my-5" onPaste={handleOtpPaste}>
                 {otp.map((digit, idx) => (
                   <input
                     key={idx}
@@ -398,7 +404,7 @@ export default function Login() {
                     autoFocus={idx === 0}
                     onChange={(e) => handleOtpChange(idx, e.target.value)}
                     onKeyDown={(e) => handleOtpKeyDown(idx, e)}
-                    className="w-10 h-12 text-center text-xl font-bold border-b-2 border-slate-300 focus:border-emerald-500 bg-slate-50 rounded-t-md focus:outline-none transition selection:bg-transparent"
+                    className="w-9 h-11 sm:w-10 sm:h-12 text-center text-lg sm:text-xl font-bold border-b-2 border-slate-300 focus:border-emerald-500 bg-slate-50 rounded-t-md focus:outline-none transition selection:bg-transparent"
                   />
                 ))}
               </div>
@@ -418,11 +424,11 @@ export default function Login() {
               </div>
             </div>
 
-            <div className="pt-4 pb-2">
+            <div className="pt-3 pb-1 sm:pt-4 sm:pb-2">
               <button
                 onClick={handleOtpSubmit}
                 disabled={loading || otp.join('').length < 6}
-                className="w-full py-3.5 bg-[#00a884] hover:bg-[#008f70] text-white font-medium rounded-full shadow-md transition-all active:scale-[0.98] text-sm cursor-pointer disabled:opacity-50 flex items-center justify-center gap-2"
+                className="w-full py-3 sm:py-3.5 bg-[#00a884] hover:bg-[#008f70] text-white font-medium rounded-full shadow-md transition-all active:scale-[0.98] text-sm cursor-pointer disabled:opacity-50 flex items-center justify-center gap-2"
               >
                 {loading ? <><Loader2 className="w-4 h-4 animate-spin" /> Verifying…</> : 'Verify & Continue'}
               </button>
@@ -432,20 +438,20 @@ export default function Login() {
 
         {/* ── STEP 4: COMPANION DEVICE QR CODE ─────────────────────────────── */}
         {step === 4 && (
-          <div className="flex-1 flex flex-col justify-between p-6 animate-fadeIn">
+          <div className="flex-1 flex flex-col justify-between p-4 sm:p-6 animate-fadeIn">
             <div>
-              <div className="flex justify-between items-center mb-6">
+              <div className="flex justify-between items-center mb-4 sm:mb-6">
                 <button onClick={() => setStep(2)} className="p-1 rounded-full text-slate-600 hover:bg-slate-100 transition" aria-label="Back">
                   <ArrowLeft className="w-5 h-5" />
                 </button>
-                <h2 className="text-base font-semibold text-emerald-700">Link with QR code</h2>
+                <h2 className="text-sm sm:text-base font-semibold text-emerald-700">Link with QR code</h2>
                 <div className="w-5" />
               </div>
 
               <div className="flex flex-col items-center text-center">
-                <div className="p-4 bg-white border-2 border-emerald-500 rounded-2xl shadow-md my-4">
-                  <div className="w-48 h-48 bg-slate-900 rounded-lg flex items-center justify-center text-white relative overflow-hidden">
-                    <QrCode className="w-40 h-40 text-white opacity-90" />
+                <div className="p-3 sm:p-4 bg-white border-2 border-emerald-500 rounded-2xl shadow-md my-2 sm:my-4">
+                  <div className="w-40 h-40 sm:w-48 sm:h-48 bg-slate-900 rounded-lg flex items-center justify-center text-white relative overflow-hidden">
+                    <QrCode className="w-32 h-32 sm:w-40 sm:h-40 text-white opacity-90" />
                     <div className="absolute inset-0 bg-emerald-500/10 pointer-events-none" />
                   </div>
                 </div>
@@ -456,10 +462,10 @@ export default function Login() {
               </div>
             </div>
 
-            <div className="pt-4 pb-2">
+            <div className="pt-3 pb-1 sm:pt-4 sm:pb-2">
               <button
                 onClick={() => setStep(2)}
-                className="w-full py-3 bg-slate-100 hover:bg-slate-200 text-slate-700 font-medium rounded-full transition-all text-sm cursor-pointer"
+                className="w-full py-2.5 sm:py-3 bg-slate-100 hover:bg-slate-200 text-slate-700 font-medium rounded-full transition-all text-sm cursor-pointer"
               >
                 Back to Phone Input
               </button>
@@ -468,6 +474,16 @@ export default function Login() {
         )}
 
       </div>
+
+      {/* Bottom-right Project Credits */}
+      <div className="fixed bottom-3 right-3 sm:bottom-5 sm:right-6 z-20 pointer-events-none select-none max-w-[200px] sm:max-w-xs">
+        <div className="bg-white/95 backdrop-blur-md px-3 py-1.5 sm:px-4 sm:py-2.5 rounded-xl sm:rounded-2xl shadow-md border border-emerald-100/80 text-right transition-all">
+          <p className="text-[11px] sm:text-xs md:text-sm font-bold text-slate-800 tracking-wide leading-tight">Asha Sherin</p>
+          <p className="text-[9px] sm:text-[10px] md:text-xs font-semibold text-emerald-600 leading-tight my-0.5 sm:my-1">guidance by</p>
+          <p className="text-[10px] sm:text-xs md:text-sm font-semibold text-slate-700 leading-tight">Jeba Malar(HOD)</p>
+        </div>
+      </div>
     </div>
   )
 }
+
