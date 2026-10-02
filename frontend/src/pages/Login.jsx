@@ -131,7 +131,7 @@ export default function Login() {
 
   // ── SHARED CARD WRAPPER ────────────────────────────────────────────────────
   const Card = ({ children, className = '' }) => (
-    <div className={`w-full max-w-sm bg-slate-900/80 backdrop-blur-xl border border-slate-700/60 rounded-3xl shadow-2xl shadow-black/50 overflow-hidden ${className}`}>
+    <div className={`shrink-0 w-full max-w-sm bg-slate-900/80 backdrop-blur-xl border border-slate-700/60 rounded-3xl shadow-2xl shadow-black/50 overflow-hidden ${className}`}>
       {children}
     </div>
   )
@@ -156,6 +156,14 @@ export default function Login() {
           .login-art   { width: 10rem !important; height: 10rem !important; }
           .login-art img { width: 8.5rem !important; height: 8.5rem !important; }
         }
+        /* Very short desktop screens (e.g. zoomed laptops): give the card all the room */
+        @media (min-width: 1024px) and (max-height: 650px) {
+          .login-right { margin-top: 4rem; margin-bottom: 0; max-height: calc(100% - 4rem) !important; }
+          .login-sub { display: none; }
+          .login-art { width: 7rem !important; height: 7rem !important; }
+          .login-art img { width: 6rem !important; height: 6rem !important; }
+          .login-left { gap: 0.75rem !important; top: 5rem !important; }
+        }
         /* Tablet / mobile: keep the card clear of the badge */
         @media (max-width: 1023px) {
           .login-right { margin-bottom: 8rem; max-height: calc(100% - 8rem) !important; }
@@ -166,6 +174,9 @@ export default function Login() {
             position: fixed; right: 0; bottom: 0; width: 0; height: 0;
             transform: scale(0.75); transform-origin: bottom right; z-index: 50;
           }
+        }
+        @media (max-height: 650px) {
+          .login-badge { transform: scale(0.55); }
         }
         @media (max-width: 480px) {
           .login-badge { transform: scale(0.65); }
@@ -572,7 +583,7 @@ export default function Login() {
 
         {/* Sub-text under card */}
         {step === 1 && (
-          <p className="text-xs text-slate-600 text-center max-w-xs">
+          <p className="login-sub text-xs text-slate-600 text-center max-w-xs">
             Real-Time Chat Platform with WebRTC Integration
           </p>
         )}
