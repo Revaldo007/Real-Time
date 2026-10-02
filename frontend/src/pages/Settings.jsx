@@ -13,6 +13,7 @@ import {
   FONT_SIZES,
   FONT_FAMILIES
 } from '../context/ThemeContext'
+import AppTitle from '../components/AppTitle'
 
 // ── Section tab definitions ────────────────────────────────────────────────
 const TABS = [
@@ -415,6 +416,13 @@ export default function Settings() {
           </div>
         </div>
 
+        {/* Project title (centred on wide screens) */}
+        <AppTitle
+          isLight={isLight}
+          compact
+          className="hidden xl:flex absolute left-1/2 -translate-x-1/2 w-[34rem] max-w-[45%]"
+        />
+
         <div className="flex items-center gap-2">
           {saveToast && (
             <div className="px-3 py-1 bg-emerald-500/20 text-emerald-400 border border-emerald-500/30 rounded-xl text-xs font-semibold flex items-center gap-1.5">
@@ -432,6 +440,11 @@ export default function Settings() {
           </button>
         </div>
       </header>
+
+      {/* Project title strip for narrower screens */}
+      <div className="xl:hidden px-4 pt-3 flex justify-center">
+        <AppTitle isLight={isLight} className="w-full max-w-2xl" />
+      </div>
 
       {/* ── Main: 3-column (nav | panel | preview) ────────────────────────── */}
       <main className="max-w-7xl mx-auto p-4 sm:p-6 lg:p-8">

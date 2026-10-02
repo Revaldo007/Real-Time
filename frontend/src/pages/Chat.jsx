@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom'
 import { ChatContext } from '../context/ChatContext'
 import { AuthContext } from '../context/AuthContext'
 import { useTheme } from '../context/ThemeContext'
+import AppTitle from '../components/AppTitle'
 import { authAPI, usersAPI, chatsAPI, messagesAPI, mediaAPI, BACKEND_URL } from '../services/api'
 import { 
   MessageSquare, MessageSquarePlus, Search, Send, Image, Video, File, Mic, Phone, Video as VideoIcon, 
@@ -547,10 +548,20 @@ export default function Chat() {
   const emojis = ['😊', '😂', '👍', '❤️', '🔥', '👏', '😮', '😢', '🎉', '💡', '💬', '🚀']
 
   return (
-    <div className={`flex h-screen w-screen overflow-hidden relative transition-colors duration-200 ${
+    <div className={`flex flex-col h-screen w-screen overflow-hidden relative transition-colors duration-200 ${
       isLight ? 'bg-slate-100 text-slate-900' : 'bg-slate-950 text-slate-100'
     }`}>
       
+      {/* PROJECT TITLE - TOP HEADER */}
+      <header className={`shrink-0 h-12 px-4 border-b flex items-center justify-center z-30 transition-colors ${
+        isLight ? 'bg-white border-slate-200' : 'bg-slate-950 border-slate-800/80'
+      }`}>
+        <AppTitle isLight={isLight} compact className="w-full max-w-3xl" />
+      </header>
+
+      {/* MAIN ROW: nav rail + sidebar + chat workspace */}
+      <div className="flex flex-1 min-h-0 w-full relative">
+
       {/* 0. WEBSITE LEFT-SIDE NAVBAR (NAV RAIL) */}
       <nav className={`chat-nav-rail hidden md:flex flex-col items-center justify-between py-4 w-[72px] border-r z-20 shrink-0 select-none shadow-2xl transition-colors ${
         isLight ? 'bg-white border-slate-200 shadow-xs' : 'bg-slate-950/95 border-slate-800/80'
@@ -1686,6 +1697,8 @@ export default function Chat() {
             </p>
           </div>
         )}
+      </div>
+
       </div>
 
       {/* 3. GROUP CREATION DIALOG MODAL */}

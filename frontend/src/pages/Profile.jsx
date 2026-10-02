@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom'
 import { useAuth } from '../hooks/useAuth'
 import { mediaAPI, BACKEND_URL } from '../services/api'
 import { ArrowLeft, User, Info, Camera, Sparkles, Check, AlertCircle } from 'lucide-react'
+import AppTitle from '../components/AppTitle'
 
 export default function Profile() {
   const { user, updateProfile } = useAuth()
@@ -66,6 +67,11 @@ export default function Profile() {
       {/* Decorative gradient glow spheres */}
       <div className="absolute top-1/4 left-1/4 -translate-x-1/2 -translate-y-1/2 w-96 h-96 bg-indigo-600/20 rounded-full blur-[120px] pointer-events-none" />
       <div className="absolute bottom-1/4 right-1/4 translate-x-1/2 translate-y-1/2 w-[400px] h-[400px] bg-violet-600/20 rounded-full blur-[140px] pointer-events-none" />
+
+      {/* Project title - top header */}
+      <div className="absolute top-0 inset-x-0 z-10 px-4 pt-5 flex justify-center pointer-events-none">
+        <AppTitle className="w-full max-w-3xl" />
+      </div>
 
       <div className="relative z-10 w-full max-w-lg mx-4 p-8 bg-slate-900/60 backdrop-blur-xl border border-slate-800 rounded-3xl shadow-2xl">
         
