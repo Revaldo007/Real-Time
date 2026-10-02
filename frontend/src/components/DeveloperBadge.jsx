@@ -100,7 +100,7 @@ export default function DeveloperBadge() {
                 <span className="block text-[10px] font-semibold uppercase tracking-wider text-slate-400">
                   Developed by
                 </span>
-                <span className="mt-0.5 block truncate text-lg font-bold tracking-tight text-white">Asha Sherin</span>
+                <span className="mt-0.5 block truncate text-lg font-bold tracking-tight text-white">Asna Sherin.A</span>
                 <span className="mt-1.5 inline-block rounded-full border border-indigo-500/30 bg-indigo-500/10 px-2.5 py-0.5 text-[11px] font-medium text-indigo-300">
                   II M.Sc Computer Science
                 </span>
