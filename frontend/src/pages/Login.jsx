@@ -153,6 +153,7 @@ export default function Login() {
           .login-title h1 { font-size: 1.5rem !important; }
           .login-right { margin-top: 4.5rem; margin-bottom: 10rem; max-height: calc(100% - 14.5rem) !important; }
           .login-left  { gap: 1rem !important; top: 6rem !important; }
+          .login-right { padding-right: 8rem !important; }
           .login-art   { width: 10rem !important; height: 10rem !important; }
           .login-art img { width: 8.5rem !important; height: 8.5rem !important; }
         }
