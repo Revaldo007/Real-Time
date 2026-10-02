@@ -140,6 +140,39 @@ export default function Login() {
   return (
     <div className="relative w-full h-screen flex flex-col items-center justify-center overflow-hidden bg-slate-950 selection:bg-indigo-500/30 p-4">
 
+      {/* Responsive layout rules (keep title, card and credit badge from colliding) */}
+      <style>{`
+        /* Desktop: leave room for the title (top) and the credit badge (bottom-right) */
+        @media (min-width: 1024px) {
+          .login-right { margin-top: 5rem; margin-bottom: 14rem; max-height: calc(100% - 19rem) !important; }
+          .login-left  { top: 6.5rem !important; bottom: 1.5rem !important; }
+        }
+        /* Short desktop screens (laptops): compact everything */
+        @media (min-width: 1024px) and (max-height: 800px) {
+          .login-title { top: 1.25rem !important; }
+          .login-title h1 { font-size: 1.5rem !important; }
+          .login-right { margin-top: 4.5rem; margin-bottom: 10rem; max-height: calc(100% - 14.5rem) !important; }
+          .login-left  { gap: 1rem !important; top: 6rem !important; }
+          .login-art   { width: 10rem !important; height: 10rem !important; }
+          .login-art img { width: 8.5rem !important; height: 8.5rem !important; }
+        }
+        /* Tablet / mobile: keep the card clear of the badge */
+        @media (max-width: 1023px) {
+          .login-right { margin-bottom: 8rem; max-height: calc(100% - 8rem) !important; }
+        }
+        /* Shrink the credit badge on small or short screens */
+        @media (max-width: 1023px), (max-height: 800px) {
+          .login-badge {
+            position: fixed; right: 0; bottom: 0; width: 0; height: 0;
+            transform: scale(0.75); transform-origin: bottom right; z-index: 50;
+          }
+        }
+        @media (max-width: 480px) {
+          .login-badge { transform: scale(0.65); }
+        }
+      `}</style>
+
+
       {/* ── Animated background orbs ──────────────────────────────────────── */}
       <div className="pointer-events-none absolute inset-0 overflow-hidden">
         <div className="absolute -top-40 -left-40 w-[500px] h-[500px] rounded-full bg-indigo-600/10 blur-[100px] animate-pulse" />
@@ -156,7 +189,7 @@ export default function Login() {
       </div>
 
       {/* ── Top page title ────────────────────────────────────────────────── */}
-      <div className="hidden lg:flex absolute top-8 inset-x-0 z-10 px-8 justify-center pointer-events-none">
+      <div className="login-title hidden lg:flex absolute top-8 inset-x-0 z-10 px-8 justify-center pointer-events-none">
         <div className="relative inline-flex flex-col items-center pb-4">
           {/* soft glow behind the text */}
           <div className="absolute inset-x-8 top-1/2 -translate-y-1/2 h-10 bg-indigo-500/25 blur-3xl rounded-full" />
@@ -174,10 +207,10 @@ export default function Login() {
       </div>
 
       {/* ── Left decorative panel (desktop) ───────────────────────────────── */}
-      <div className="hidden lg:flex absolute left-0 top-0 bottom-0 w-[42%] flex-col justify-center items-center px-12 gap-8">
+      <div className="login-left hidden lg:flex absolute left-0 top-0 bottom-0 w-[42%] flex-col justify-center items-center px-12 gap-8">
 
         {/* Animated mockup */}
-        <div className="relative w-64 h-64 flex items-center justify-center">
+        <div className="login-art relative w-64 h-64 flex items-center justify-center">
           <div className="absolute inset-0 rounded-full bg-indigo-600/10 blur-2xl animate-pulse" />
           <img
             src={conversationGif || '/Conversation.gif'}
@@ -208,7 +241,7 @@ export default function Login() {
       </div>
 
       {/* ── Right: Auth card area ──────────────────────────────────────────── */}
-      <div className="relative z-10 flex flex-col items-center gap-6 w-full max-h-full overflow-y-auto py-4 lg:ml-auto lg:w-[58%] lg:pr-16 lg:pl-4">
+      <div className="login-right relative z-10 flex flex-col items-center gap-6 w-full max-h-full overflow-y-auto py-4 lg:ml-auto lg:w-[58%] lg:pr-16 lg:pl-4">
 
         {/* Mobile brand */}
         <div className="lg:hidden flex items-center gap-3">
@@ -546,7 +579,9 @@ export default function Login() {
       </div>
 
       {/* ── Project Credits ────────────────────────────────────────────────── */}
-      <DeveloperBadge />
+      <div className="login-badge">
+        <DeveloperBadge />
+      </div>
 
     </div>
   )
