@@ -2,6 +2,7 @@ import React, { useState, useEffect, useRef, useContext } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { ChatContext } from '../context/ChatContext'
 import { AuthContext } from '../context/AuthContext'
+import { useTheme } from '../context/ThemeContext'
 import { authAPI, usersAPI, chatsAPI, messagesAPI, mediaAPI, BACKEND_URL } from '../services/api'
 import { 
   MessageSquare, MessageSquarePlus, Search, Send, Image, Video, File, Mic, Phone, Video as VideoIcon, 
@@ -17,6 +18,17 @@ export default function Chat() {
     sendTypingStatus, fetchChats, callState, callType, callUser, localStream, 
     remoteStream, remoteAudioRef, startCall, acceptCall, hangupCall
   } = useContext(ChatContext)
+
+  const {
+    themeMode,
+    currentAccent,
+    getActiveWallpaperUrl,
+    wallpaperDim,
+    bubbleTextColor,
+    currentFontSize
+  } = useTheme()
+  const isLight = themeMode === 'light'
+  const activeWallpaper = getActiveWallpaperUrl()
 
   const navigate = useNavigate()
   
@@ -38,6 +50,26 @@ export default function Chat() {
   const [selectContactQuery, setSelectContactQuery] = useState('')
   const [showNewContact, setShowNewContact] = useState(false)
   const [contactsList, setContactsList] = useState([])
+  
+  // Navigation Bar & Filtering States
+  const [sidebarTab, setSidebarTab] = useState('chats') // 'chats' | 'contacts'
+  const [contactsSearch, setContactsSearch] = useState('')
+
+  // Load registered contacts, and keep names fresh so Contacts matches Chats
+  // (reload on mount, when the Contacts tab opens, when chats change, and on window focus)
+  useEffect(() => {
+    const loadAllContacts = async () => {
+      try {
+        const res = await usersAPI.search('')
+        setContactsList(res.data)
+      } catch (err) {
+        console.error('Failed to load contacts:', err)
+      }
+    }
+    loadAllContacts()
+    window.addEventListener('focus', loadAllContacts)
+    return () => window.removeEventListener('focus', loadAllContacts)
+  }, [sidebarTab, chats])
   
   // New Contact Form State
   const [newName, setNewName] = useState('')
@@ -457,8 +489,22 @@ export default function Chat() {
 
   // Helpers
   const formatTime = (isoString) => {
-    const d = new Date(isoString)
-    return d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+    if (!isoString) return ''
+    // Server timestamps without a timezone (e.g. "2026-10-02T05:43:00") are UTC.
+    // Mark them as UTC so the browser converts them to this device's local time.
+    let value = String(isoString)
+    if (!/(Z|[+-]\d{2}:?\d{2})$/i.test(value)) value = value.replace(' ', 'T') + 'Z'
+    const d = new Date(value)
+    if (isNaN(d.getTime())) return ''
+    // Fixed format ("11:13 AM") in the device's own timezone, same on every browser/locale
+    return d
+      .toLocaleTimeString('en-US', {
+        hour: '2-digit',
+        minute: '2-digit',
+        hour12: true,
+        timeZone: Intl.DateTimeFormat().resolvedOptions().timeZone,
+      })
+      .toUpperCase()
   }
 
   const getChatNameAndImage = (chat) => {
@@ -501,174 +547,472 @@ export default function Chat() {
   const emojis = ['😊', '😂', '👍', '❤️', '🔥', '👏', '😮', '😢', '🎉', '💡', '💬', '🚀']
 
   return (
-    <div className="flex h-screen w-screen bg-slate-950 text-slate-100 overflow-hidden relative">
+    <div className={`flex h-screen w-screen overflow-hidden relative transition-colors duration-200 ${
+      isLight ? 'bg-slate-100 text-slate-900' : 'bg-slate-950 text-slate-100'
+    }`}>
       
-      {/* 1. LEFT SIDEBAR */}
-      <div className={`chat-sidebar h-full bg-slate-900/40 backdrop-blur-md border-r border-slate-800 flex flex-col shrink-0 relative ${mobileView === 'chat' ? 'mobile-hidden' : ''}`}>
-        {/* Sidebar Header */}
-        <div className="h-16 px-4 border-b border-slate-800 flex items-center justify-between relative bg-slate-900/50">
-          <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-full border border-indigo-500/20 bg-slate-950 overflow-hidden flex items-center justify-center">
+      {/* 0. WEBSITE LEFT-SIDE NAVBAR (NAV RAIL) */}
+      <nav className={`chat-nav-rail hidden md:flex flex-col items-center justify-between py-4 w-[72px] border-r z-20 shrink-0 select-none shadow-2xl transition-colors ${
+        isLight ? 'bg-white border-slate-200 shadow-xs' : 'bg-slate-950/95 border-slate-800/80'
+      }`}>
+        {/* Brand / Logo */}
+        <div className="flex flex-col items-center gap-6 w-full">
+          <button 
+            onClick={() => { setSidebarTab('chats'); setShowNewContact(false); setShowSelectContact(false); }}
+            className={`w-11 h-11 rounded-2xl bg-gradient-to-tr ${currentAccent.gradient} flex items-center justify-center text-white shadow-lg ${currentAccent.glow} hover:scale-105 active:scale-95 transition-all cursor-pointer group relative`}
+            title="Rivo Messenger"
+          >
+            <MessageSquare className="w-5 h-5 fill-white/20" />
+            <span className="absolute left-full ml-3 px-2.5 py-1 bg-slate-800 text-slate-200 text-xs font-medium rounded-lg whitespace-nowrap opacity-0 group-hover:opacity-100 pointer-events-none transition-opacity shadow-xl border border-slate-700 z-50">
+              Rivo Messenger
+            </span>
+          </button>
+
+          {/* Navigation Links */}
+          <div className="flex flex-col items-center gap-2.5 w-full px-2">
+            {/* 1. Chats Tab */}
+            <div className="relative group w-full flex justify-center">
+              {sidebarTab === 'chats' && (
+                <span className="absolute left-0 top-1/2 -translate-y-1/2 w-1 h-6 bg-indigo-500 rounded-r-full shadow-sm shadow-indigo-500" />
+              )}
+              <button
+                onClick={() => { setSidebarTab('chats'); setShowNewContact(false); setShowSelectContact(false); }}
+                className={`w-11 h-11 rounded-2xl flex items-center justify-center transition-all cursor-pointer relative ${
+                  sidebarTab === 'chats'
+                    ? 'bg-indigo-600/20 text-indigo-400 border border-indigo-500/30 shadow-inner'
+                    : isLight ? 'text-slate-500 hover:text-slate-800 hover:bg-slate-100' : 'text-slate-400 hover:text-slate-200 hover:bg-slate-850/60'
+                }`}
+                title="Chats"
+              >
+                <MessageSquare className="w-5 h-5" />
+                {chats.length > 0 && (
+                  <span className="absolute -top-1 -right-1 w-4 h-4 bg-indigo-600 text-[10px] text-white font-bold rounded-full flex items-center justify-center border-2 border-slate-950">
+                    {chats.length > 9 ? '9+' : chats.length}
+                  </span>
+                )}
+              </button>
+              <span className="absolute left-full ml-3 px-2.5 py-1 bg-slate-800 text-slate-200 text-xs font-medium rounded-lg whitespace-nowrap opacity-0 group-hover:opacity-100 pointer-events-none transition-opacity shadow-xl border border-slate-700 z-50">
+                Chats
+              </span>
+            </div>
+
+            {/* 2. Add Users (Highlighted & Distinctive!) */}
+            <div className="relative group w-full flex justify-center">
+              <button
+                onClick={() => {
+                  setShowNewContact(true)
+                  setShowSelectContact(false)
+                }}
+                className="w-11 h-11 rounded-2xl flex items-center justify-center transition-all cursor-pointer bg-gradient-to-tr from-emerald-500/15 to-indigo-500/15 border border-emerald-500/40 text-emerald-400 hover:bg-emerald-500/25 hover:border-emerald-400/60 hover:scale-105 active:scale-95 shadow-md shadow-emerald-500/10"
+                title="Add User"
+              >
+                <UserPlus className="w-5 h-5" />
+              </button>
+              <span className="absolute left-full ml-3 px-2.5 py-1 bg-emerald-950 text-emerald-300 text-xs font-medium rounded-lg whitespace-nowrap opacity-0 group-hover:opacity-100 pointer-events-none transition-opacity shadow-xl border border-emerald-800/80 z-50 flex items-center gap-1.5">
+                <UserPlus className="w-3.5 h-3.5" /> Add User
+              </span>
+            </div>
+
+            {/* 3. Contacts / Users Directory */}
+            <div className="relative group w-full flex justify-center">
+              {sidebarTab === 'contacts' && (
+                <span className="absolute left-0 top-1/2 -translate-y-1/2 w-1 h-6 bg-indigo-500 rounded-r-full shadow-sm shadow-indigo-500" />
+              )}
+              <button
+                onClick={() => {
+                  setSidebarTab('contacts')
+                  setShowNewContact(false)
+                  setShowSelectContact(false)
+                }}
+                className={`w-11 h-11 rounded-2xl flex items-center justify-center transition-all cursor-pointer ${
+                  sidebarTab === 'contacts'
+                    ? 'bg-indigo-600/20 text-indigo-400 border border-indigo-500/30 shadow-inner'
+                    : isLight ? 'text-slate-500 hover:text-slate-800 hover:bg-slate-100' : 'text-slate-400 hover:text-slate-200 hover:bg-slate-850/60'
+                }`}
+                title="Contacts"
+              >
+                <Users className="w-5 h-5" />
+              </button>
+              <span className="absolute left-full ml-3 px-2.5 py-1 bg-slate-800 text-slate-200 text-xs font-medium rounded-lg whitespace-nowrap opacity-0 group-hover:opacity-100 pointer-events-none transition-opacity shadow-xl border border-slate-700 z-50">
+                Contacts Directory
+              </span>
+            </div>
+
+          </div>
+        </div>
+
+        {/* Bottom Actions: Settings, Profile Avatar, Logout */}
+        <div className="flex flex-col items-center gap-3 w-full">
+          {/* Settings (Navigates to /settings!) */}
+          <div className="relative group">
+            <button
+              onClick={() => navigate('/settings')}
+              className={`w-10 h-10 rounded-xl flex items-center justify-center transition cursor-pointer ${
+                isLight ? 'text-slate-600 hover:text-slate-900 hover:bg-slate-200' : 'text-slate-400 hover:text-slate-200 hover:bg-slate-850/60'
+              }`}
+              title="Settings & Appearance"
+            >
+              <Settings className="w-5 h-5" />
+            </button>
+            <span className="absolute left-full ml-3 px-2.5 py-1 bg-slate-800 text-slate-200 text-xs font-medium rounded-lg whitespace-nowrap opacity-0 group-hover:opacity-100 pointer-events-none transition-opacity shadow-xl border border-slate-700 z-50">
+              Settings & Customization
+            </span>
+          </div>
+
+          {/* Profile Avatar (Navigates to /profile!) */}
+          <div className="relative group">
+            <button
+              onClick={() => navigate('/profile')}
+              className="w-10 h-10 rounded-full border-2 border-slate-700 hover:border-indigo-500 bg-slate-900 overflow-hidden flex items-center justify-center transition cursor-pointer relative shadow-md"
+              title="Edit Profile"
+            >
               {user?.profile_image ? (
-                <img src={`${BACKEND_URL}${user.profile_image}`} alt="Profile" className="w-full h-full object-cover" />
+                <img src={`${BACKEND_URL}${user.profile_image}`} alt={user?.username} className="w-full h-full object-cover" />
               ) : (
                 <User className="w-5 h-5 text-slate-450" />
               )}
-            </div>
-            <div className="flex flex-col">
-              <span className="text-sm font-semibold truncate max-w-[130px]">{user?.username}</span>
-              <span className="text-[10px] text-emerald-400 font-medium flex items-center gap-1">
-                <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-ping" /> Online
-              </span>
-            </div>
+              <span className="absolute bottom-0 right-0 w-2.5 h-2.5 bg-emerald-500 border-2 border-slate-950 rounded-full" />
+            </button>
+            <span className="absolute left-full ml-3 px-2.5 py-1 bg-slate-800 text-slate-200 text-xs font-medium rounded-lg whitespace-nowrap opacity-0 group-hover:opacity-100 pointer-events-none transition-opacity shadow-xl border border-slate-700 z-50">
+              {user?.username || 'Edit Profile'}
+            </span>
           </div>
-          
-          <div className="flex items-center gap-1">
-            <button
-              onClick={() => setShowCreateGroup(true)}
-              title="Create Group"
-              className="p-2 hover:bg-slate-800 rounded-xl transition text-slate-400 hover:text-slate-100 cursor-pointer"
-            >
-              <Users className="w-4 h-4" />
-            </button>
-            <button
-              onClick={() => navigate('/profile')}
-              title="Settings"
-              className="p-2 hover:bg-slate-800 rounded-xl transition text-slate-400 hover:text-slate-100 cursor-pointer"
-            >
-              <Settings className="w-4 h-4" />
-            </button>
+
+          {/* Logout */}
+          <div className="relative group">
             <button
               onClick={logout}
+              className="w-10 h-10 rounded-xl flex items-center justify-center text-slate-500 hover:text-rose-400 hover:bg-rose-500/10 transition cursor-pointer"
               title="Logout"
-              className="p-2 hover:bg-slate-800 rounded-xl transition text-rose-400 hover:text-rose-300 cursor-pointer"
             >
               <LogOut className="w-4 h-4" />
             </button>
+            <span className="absolute left-full ml-3 px-2.5 py-1 bg-rose-950 text-rose-300 text-xs font-medium rounded-lg whitespace-nowrap opacity-0 group-hover:opacity-100 pointer-events-none transition-opacity shadow-xl border border-rose-800/80 z-50">
+              Log Out
+            </span>
           </div>
         </div>
+      </nav>
 
-        {/* Contacts Search Bar */}
-        <div className="p-3 border-b border-slate-850">
-          <div className="relative">
-            <Search className="absolute left-3 top-2.5 w-4 h-4 text-slate-500" />
-            <input
-              type="text"
-              placeholder="Search users to chat..."
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              className="w-full pl-10 pr-8 py-2 bg-slate-950/40 border border-slate-800 focus:outline-none focus:border-indigo-500 rounded-xl text-xs text-slate-100"
-            />
-            {searchQuery && (
-              <button onClick={() => setSearchQuery('')} className="absolute right-3 top-2.5 text-slate-500 hover:text-slate-200">
-                <X className="w-4 h-4" />
-              </button>
-            )}
-          </div>
-        </div>
-
-        {/* Contacts Search Results Overlay */}
-        {showSearch && (
-          <div className="flex-1 overflow-y-auto bg-slate-900/90 divide-y divide-slate-850">
-            {searchResults.length === 0 ? (
-              <div className="p-4 text-center text-xs text-slate-500">No users found</div>
-            ) : (
-              searchResults.map(contact => (
-                <div
-                  key={contact.id}
-                  onClick={() => startDirectChat(contact.id)}
-                  className="flex items-center gap-3 p-3 hover:bg-indigo-600/10 cursor-pointer transition"
-                >
-                  <div className="w-10 h-10 rounded-full bg-slate-950 overflow-hidden flex items-center justify-center">
-                    {contact.profile_image ? (
-                      <img src={`${BACKEND_URL}${contact.profile_image}`} alt="Profile" className="w-full h-full object-cover" />
-                    ) : (
-                      <User className="w-5 h-5 text-slate-500" />
-                    )}
-                  </div>
-                  <div className="flex flex-col">
-                    <span className="text-sm font-medium">{contact.username}</span>
-                    <span className="text-xs text-slate-400 truncate max-w-[200px]">{contact.about}</span>
-                  </div>
-                </div>
-              ))
-            )}
-          </div>
-        )}
-
-        {/* Chats List Preview */}
-        {!showSearch && (
-          <div className="flex-1 overflow-y-auto divide-y divide-slate-850/50">
-            {chats.length === 0 ? (
-              <div className="p-8 text-center text-xs text-slate-500 flex flex-col items-center gap-2 mt-12">
-                <MessageSquare className="w-8 h-8 text-slate-650" />
-                <span>No active chats. Search above to start a conversation!</span>
+      {/* 1. SECONDARY SIDEBAR */}
+      <div className={`chat-sidebar h-full border-r flex flex-col shrink-0 relative transition-colors ${
+        isLight ? 'bg-white border-slate-200' : 'bg-slate-900/40 backdrop-blur-md border-slate-800'
+      } ${mobileView === 'chat' ? 'mobile-hidden' : ''}`}>
+        
+        {/* TAB 1: CHATS VIEW */}
+        {sidebarTab === 'chats' && (
+          <>
+            {/* Sidebar Header */}
+            <div className={`h-16 px-4 border-b flex items-center justify-between relative transition-colors ${
+              isLight ? 'bg-slate-50/80 border-slate-200' : 'bg-slate-900/50 border-slate-800'
+            }`}>
+              <div>
+                <h1 className={`text-base font-bold font-outfit tracking-tight ${isLight ? 'text-slate-900' : 'text-white'}`}>Chats</h1>
+                <span className="text-[11px] text-slate-400">{chats.length} active conversations</span>
               </div>
-            ) : (
-              chats.map(chat => {
-                const info = getChatNameAndImage(chat)
-                const isActive = activeChat && activeChat.id === chat.id
-                
-                // Check if target typing
-                const isTyping = typingUsers[chat.id] && Object.values(typingUsers[chat.id]).some(t => t === true)
-                
-                return (
-                  <div
-                    key={chat.id}
-                    onClick={() => { setActiveChat(chat); setMobileView('chat') }}
-                    className={`flex items-center gap-3 p-4 hover:bg-slate-850/30 cursor-pointer transition relative ${isActive ? 'bg-indigo-600/10 hover:bg-indigo-600/15 border-l-2 border-indigo-500' : ''}`}
-                  >
-                    {/* Avatar with Presence dot — click to open context menu */}
-                    <div
-                      className="relative shrink-0"
-                      onClick={(e) => {
-                        e.stopPropagation() // don't open the chat
-                        setAvatarMenuChat(chat)
-                      }}
-                    >
-                      <div className="w-11 h-11 rounded-full bg-slate-950 border border-slate-800 overflow-hidden flex items-center justify-center cursor-pointer hover:ring-2 hover:ring-rose-500/60 hover:ring-offset-1 hover:ring-offset-slate-900 transition-all">
-                        {info.image ? (
-                          <img src={`${BACKEND_URL}${info.image}`} alt={info.name} className="w-full h-full object-cover" />
-                        ) : (
-                          <User className="w-5 h-5 text-slate-550" />
-                        )}
-                      </div>
-                      {info.isOnline && (
-                        <span className="absolute bottom-0.5 right-0.5 w-3 h-3 bg-emerald-500 border-2 border-slate-900 rounded-full" />
-                      )}
-                    </div>
+              
+              <div className="flex items-center gap-1.5">
+                {/* Prominent Add User button */}
+                <button
+                  onClick={() => setShowNewContact(true)}
+                  className="flex items-center gap-1.5 px-3 py-1.5 bg-emerald-500/15 hover:bg-emerald-500/25 border border-emerald-500/30 text-emerald-400 hover:text-emerald-300 rounded-xl text-xs font-semibold transition cursor-pointer shadow-sm shadow-emerald-500/10 active:scale-95"
+                  title="Add User"
+                >
+                  <UserPlus className="w-3.5 h-3.5 text-emerald-400" />
+                  <span>Add User</span>
+                </button>
+              </div>
+            </div>
 
-                    <div className="flex-1 min-w-0">
-                      <div className="flex justify-between items-center mb-1">
-                        <span className="text-sm font-semibold truncate pr-2">{info.name}</span>
-                        {chat.last_message && (
-                          <span className="text-[10px] text-slate-500 shrink-0">
-                            {formatTime(chat.last_message.created_at)}
-                          </span>
+            {/* Contacts Search Bar */}
+            <div className={`p-3 border-b ${isLight ? 'border-slate-200' : 'border-slate-850'}`}>
+              <div className="relative">
+                <Search className="absolute left-3 top-2.5 w-4 h-4 text-slate-500" />
+                <input
+                  type="text"
+                  placeholder="Search chats or users..."
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                  className={`w-full pl-10 pr-8 py-2 border rounded-xl text-xs transition-colors ${
+                    isLight ? 'bg-slate-100 border-slate-200 text-slate-900 focus:outline-none focus:border-indigo-500' : 'bg-slate-950/40 border-slate-800 focus:outline-none focus:border-indigo-500 text-slate-100'
+                  }`}
+                />
+                {searchQuery && (
+                  <button onClick={() => setSearchQuery('')} className="absolute right-3 top-2.5 text-slate-500 hover:text-slate-200 cursor-pointer">
+                    <X className="w-4 h-4" />
+                  </button>
+                )}
+              </div>
+            </div>
+
+            {/* Search Results Overlay */}
+            {showSearch && (
+              <div className="flex-1 overflow-y-auto bg-slate-900/90 divide-y divide-slate-850">
+                {searchResults.length === 0 ? (
+                  <div className="p-4 text-center text-xs text-slate-500">No users found</div>
+                ) : (
+                  searchResults.map(contact => (
+                    <div
+                      key={contact.id}
+                      onClick={() => startDirectChat(contact.id)}
+                      className="flex items-center gap-3 p-3 hover:bg-indigo-600/10 cursor-pointer transition"
+                    >
+                      <div className="w-10 h-10 rounded-full bg-slate-950 overflow-hidden flex items-center justify-center shrink-0">
+                        {contact.profile_image ? (
+                          <img src={`${BACKEND_URL}${contact.profile_image}`} alt="Profile" className="w-full h-full object-cover" />
+                        ) : (
+                          <User className="w-5 h-5 text-slate-500" />
                         )}
                       </div>
+                      <div className="flex flex-col min-w-0 flex-1">
+                        <span className="text-sm font-medium text-slate-100 truncate">{contact.username}</span>
+                        <span className="text-xs text-slate-400 truncate">{contact.about || contact.phone_number}</span>
+                      </div>
+                      <button
+                        onClick={(e) => { e.stopPropagation(); startDirectChat(contact.id); }}
+                        className="px-2.5 py-1 bg-indigo-600 hover:bg-indigo-500 text-white rounded-lg text-xs font-medium cursor-pointer"
+                      >
+                        Chat
+                      </button>
+                    </div>
+                  ))
+                )}
+              </div>
+            )}
+
+            {/* Chats List Preview */}
+            {!showSearch && (
+              <div className="flex-1 overflow-y-auto divide-y divide-slate-850/50">
+                {chats.length === 0 ? (
+                  <div className="p-8 text-center text-xs text-slate-500 flex flex-col items-center gap-3 mt-8">
+                    <div className="w-12 h-12 rounded-2xl bg-indigo-600/10 border border-indigo-500/20 flex items-center justify-center text-indigo-400">
+                      <MessageSquare className="w-6 h-6" />
+                    </div>
+                    <span>No active chats yet.</span>
+                    <button
+                      onClick={() => setShowNewContact(true)}
+                      className="mt-1 px-3 py-1.5 bg-gradient-to-r from-indigo-600 to-violet-600 hover:from-indigo-500 hover:to-violet-500 text-white rounded-xl text-xs font-medium transition cursor-pointer shadow-md shadow-indigo-600/20"
+                    >
+                      + Add New User
+                    </button>
+                  </div>
+                ) : (
+                  chats.map(chat => {
+                      const info = getChatNameAndImage(chat)
+                      const isActive = activeChat && activeChat.id === chat.id
+                      const isTyping = typingUsers[chat.id] && Object.values(typingUsers[chat.id]).some(t => t === true)
                       
-                      {isTyping ? (
-                        <span className="text-xs text-indigo-400 font-medium animate-pulse">Typing...</span>
-                      ) : chat.last_message ? (
-                        <p className="text-xs text-slate-400 truncate max-w-[200px]">
-                          {chat.last_message.message_type !== 'text' ? `[${chat.last_message.message_type}]` : chat.last_message.message}
-                        </p>
-                      ) : (
-                        <span className="text-xs text-slate-500">No messages yet</span>
+                      return (
+                        <div
+                          key={chat.id}
+                          onClick={() => { setActiveChat(chat); setMobileView('chat') }}
+                          className={`flex items-center gap-3 p-4 hover:bg-slate-850/30 cursor-pointer transition relative ${isActive ? 'bg-indigo-600/10 hover:bg-indigo-600/15 border-l-2 border-indigo-500' : ''}`}
+                        >
+                          {/* Avatar with Presence dot */}
+                          <div
+                            className="relative shrink-0"
+                            onClick={(e) => {
+                              e.stopPropagation()
+                              setAvatarMenuChat(chat)
+                            }}
+                          >
+                            <div className="w-11 h-11 rounded-full bg-slate-950 border border-slate-800 overflow-hidden flex items-center justify-center cursor-pointer hover:ring-2 hover:ring-indigo-500/60 hover:ring-offset-1 hover:ring-offset-slate-900 transition-all">
+                              {info.image ? (
+                                <img src={`${BACKEND_URL}${info.image}`} alt={info.name} className="w-full h-full object-cover" />
+                              ) : (
+                                <User className="w-5 h-5 text-slate-550" />
+                              )}
+                            </div>
+                            {info.isOnline && (
+                              <span className="absolute bottom-0.5 right-0.5 w-3 h-3 bg-emerald-500 border-2 border-slate-900 rounded-full" />
+                            )}
+                          </div>
+
+                          <div className="flex-1 min-w-0">
+                            <div className="flex justify-between items-center mb-1">
+                              <span className="text-sm font-semibold truncate pr-2">{info.name}</span>
+                              {chat.last_message && (
+                                <span className="text-[10px] text-slate-500 shrink-0">
+                                  {formatTime(chat.last_message.created_at)}
+                                </span>
+                              )}
+                            </div>
+                            
+                            {isTyping ? (
+                              <span className="text-xs text-indigo-400 font-medium animate-pulse">Typing...</span>
+                            ) : chat.last_message ? (
+                              <p className="text-xs text-slate-400 truncate max-w-[200px]">
+                                {chat.last_message.message_type !== 'text' ? `[${chat.last_message.message_type}]` : chat.last_message.message}
+                              </p>
+                            ) : (
+                              <span className="text-xs text-slate-500">No messages yet</span>
+                            )}
+                          </div>
+                        </div>
+                      )
+                    })
+                )}
+              </div>
+            )}
+          </>
+        )}
+
+        {/* TAB 2: CONTACTS & DIRECTORY VIEW */}
+        {sidebarTab === 'contacts' && (
+          <>
+            {/* Contacts Header */}
+            <div className="h-16 px-4 border-b border-slate-800 flex items-center justify-between relative bg-slate-900/50">
+              <div>
+                <h1 className="text-base font-bold font-outfit text-white tracking-tight">Contacts</h1>
+                <span className="text-[11px] text-slate-400">{contactsList.length} users registered</span>
+              </div>
+              <button
+                onClick={() => setShowNewContact(true)}
+                className="flex items-center gap-1 px-3 py-1.5 bg-gradient-to-r from-emerald-500 via-emerald-600 to-indigo-600 hover:from-emerald-400 hover:to-indigo-500 text-white rounded-xl text-xs font-semibold transition cursor-pointer shadow-md shadow-emerald-600/20 active:scale-95"
+              >
+                <UserPlus className="w-3.5 h-3.5" />
+                <span>+ Add User</span>
+              </button>
+            </div>
+
+            {/* Contacts Search Bar */}
+            <div className="p-3 border-b border-slate-850">
+              <div className="relative">
+                <Search className="absolute left-3 top-2.5 w-4 h-4 text-slate-500" />
+                <input
+                  type="text"
+                  placeholder="Search contacts by name or phone..."
+                  value={contactsSearch}
+                  onChange={(e) => setContactsSearch(e.target.value)}
+                  className="w-full pl-10 pr-8 py-2 bg-slate-950/40 border border-slate-800 focus:outline-none focus:border-indigo-500 rounded-xl text-xs text-slate-100"
+                />
+                {contactsSearch && (
+                  <button onClick={() => setContactsSearch('')} className="absolute right-3 top-2.5 text-slate-500 hover:text-slate-200 cursor-pointer">
+                    <X className="w-4 h-4" />
+                  </button>
+                )}
+              </div>
+            </div>
+
+            {/* Quick Action: Add New Contact Card */}
+            <div
+              onClick={() => setShowNewContact(true)}
+              className="m-3 p-3 bg-gradient-to-r from-indigo-950/40 via-slate-900 to-violet-950/40 border border-indigo-500/20 hover:border-indigo-400/50 rounded-2xl flex items-center gap-3 cursor-pointer transition-all hover:scale-[1.01] active:scale-[0.99] group shadow-md"
+            >
+              <div className="w-10 h-10 rounded-xl bg-gradient-to-tr from-emerald-500 to-indigo-500 flex items-center justify-center text-white shadow-md shadow-emerald-500/20 group-hover:scale-105 transition-transform shrink-0">
+                <UserPlus className="w-5 h-5" />
+              </div>
+              <div className="flex-1 min-w-0">
+                <h4 className="text-xs font-semibold text-slate-100 group-hover:text-white flex items-center gap-1.5">
+                  Add New Contact
+                  <span className="text-[10px] px-1.5 py-0.2 rounded-full bg-emerald-500/20 text-emerald-300 font-medium">Quick</span>
+                </h4>
+                <p className="text-[11px] text-slate-400 truncate">Enter phone number to chat instantly</p>
+              </div>
+            </div>
+
+            {/* Contacts Directory List */}
+            <div className="flex-1 overflow-y-auto divide-y divide-slate-850/50">
+              {contactsList
+                .filter(c => {
+                  if (!contactsSearch.trim()) return true
+                  const q = contactsSearch.toLowerCase()
+                  return (
+                    (c.username && c.username.toLowerCase().includes(q)) ||
+                    (c.phone_number && c.phone_number.includes(q)) ||
+                    (c.about && c.about.toLowerCase().includes(q))
+                  )
+                })
+                .map(contact => {
+                  const isOnline = onlineUsers.has(contact.id)
+                  const isSelf = contact.id === user?.id
+
+                  return (
+                    <div
+                      key={contact.id}
+                      className="flex items-center justify-between p-3.5 hover:bg-slate-850/30 transition"
+                    >
+                      <div className="flex items-center gap-3 min-w-0 flex-1 pr-2">
+                        <div className="relative shrink-0">
+                          <div className="w-10 h-10 rounded-full bg-slate-950 border border-slate-800 overflow-hidden flex items-center justify-center">
+                            {contact.profile_image ? (
+                              <img src={`${BACKEND_URL}${contact.profile_image}`} alt={contact.username} className="w-full h-full object-cover" />
+                            ) : (
+                              <User className="w-5 h-5 text-slate-500" />
+                            )}
+                          </div>
+                          {isOnline && (
+                            <span className="absolute bottom-0 right-0 w-2.5 h-2.5 bg-emerald-500 border-2 border-slate-900 rounded-full" />
+                          )}
+                        </div>
+
+                        <div className="min-w-0 flex-1">
+                          <div className="flex items-center gap-1.5">
+                            <span className="text-sm font-semibold text-slate-100 truncate">{contact.username}</span>
+                            {isSelf && (
+                              <span className="text-[10px] px-1.5 py-0.2 rounded bg-indigo-500/20 text-indigo-300">You</span>
+                            )}
+                          </div>
+                          <span className="text-xs text-slate-400 truncate block">
+                            {contact.phone_number || contact.about || 'Available'}
+                          </span>
+                        </div>
+                      </div>
+
+                      {!isSelf && (
+                        <button
+                          onClick={() => {
+                            startDirectChat(contact.id)
+                            setSidebarTab('chats')
+                          }}
+                          className="px-3 py-1.5 bg-indigo-600/15 hover:bg-indigo-600/25 border border-indigo-500/30 hover:border-indigo-400 text-indigo-300 hover:text-white rounded-xl text-xs font-semibold transition active:scale-95 cursor-pointer shrink-0"
+                        >
+                          Message
+                        </button>
                       )}
                     </div>
-                  </div>
-                )
-              })
-            )}
-          </div>
+                  )
+                })}
+            </div>
+          </>
         )}
+
+        {/* Mobile Bottom Navigation Bar (< 768px) */}
+        <div className="md:hidden mt-auto border-t border-slate-800 bg-slate-950/95 px-3 py-2 flex items-center justify-around z-20 shrink-0">
+          <button
+            onClick={() => { setSidebarTab('chats'); setShowNewContact(false); }}
+            className={`flex flex-col items-center gap-1 p-1.5 rounded-xl text-[11px] ${sidebarTab === 'chats' ? 'text-indigo-400 font-semibold' : 'text-slate-400'}`}
+          >
+            <MessageSquare className="w-5 h-5" />
+            <span>Chats</span>
+          </button>
+          <button
+            onClick={() => setShowNewContact(true)}
+            className="flex flex-col items-center gap-1 p-1.5 rounded-xl text-[11px] text-emerald-400 font-semibold"
+          >
+            <UserPlus className="w-5 h-5" />
+            <span>Add User</span>
+          </button>
+          <button
+            onClick={() => { setSidebarTab('contacts'); setShowNewContact(false); }}
+            className={`flex flex-col items-center gap-1 p-1.5 rounded-xl text-[11px] ${sidebarTab === 'contacts' ? 'text-indigo-400 font-semibold' : 'text-slate-400'}`}
+          >
+            <Users className="w-5 h-5" />
+            <span>Contacts</span>
+          </button>
+          <button
+            onClick={() => navigate('/profile')}
+            className="flex flex-col items-center gap-1 p-1.5 rounded-xl text-[11px] text-slate-400"
+          >
+            <User className="w-5 h-5" />
+            <span>Profile</span>
+          </button>
+        </div>
 
         {/* Rivo New Chat Floating Action Button (FAB) */}
         <button
           onClick={handleOpenSelectContact}
-          className="absolute bottom-6 right-6 z-20 w-13 h-13 sm:w-14 sm:h-14 bg-gradient-to-tr from-indigo-600 via-indigo-500 to-violet-500 hover:from-indigo-500 hover:to-violet-400 active:scale-95 text-white rounded-2xl sm:rounded-3xl shadow-xl shadow-indigo-600/35 border border-indigo-400/30 flex items-center justify-center transition-all duration-200 cursor-pointer group hover:shadow-indigo-500/50 hover:-translate-y-0.5"
+          className="absolute bottom-20 md:bottom-6 right-6 z-20 w-13 h-13 sm:w-14 sm:h-14 bg-gradient-to-tr from-indigo-600 via-indigo-500 to-violet-500 hover:from-indigo-500 hover:to-violet-400 active:scale-95 text-white rounded-2xl sm:rounded-3xl shadow-xl shadow-indigo-600/35 border border-indigo-400/30 flex items-center justify-center transition-all duration-200 cursor-pointer group hover:shadow-indigo-500/50 hover:-translate-y-0.5"
           title="New Chat"
         >
           <MessageSquarePlus className="w-6 h-6 text-white group-hover:scale-110 transition-transform duration-200 drop-shadow" />
@@ -761,20 +1105,6 @@ export default function Chat() {
                 {/* Quick Actions (only show when not searching) */}
                 {!showSelectContactSearch && (
                   <div className="p-2 space-y-1">
-                    {/* New Group Option */}
-                    <div 
-                      onClick={() => {
-                        setShowSelectContact(false)
-                        setShowCreateGroup(true)
-                      }}
-                      className="flex items-center gap-4 p-3 hover:bg-slate-800/60 rounded-xl cursor-pointer transition"
-                    >
-                      <div className="w-10 h-10 rounded-full bg-gradient-to-tr from-indigo-500 to-violet-500 flex items-center justify-center text-white shadow-md shadow-indigo-500/20">
-                        <Users className="w-5 h-5" />
-                      </div>
-                      <span className="text-sm font-medium text-slate-100">New group</span>
-                    </div>
-
                     {/* New Contact Option */}
                     <div 
                       onClick={() => setShowNewContact(true)}
@@ -945,16 +1275,22 @@ export default function Chat() {
       </div>
 
       {/* 2. CHAT MAIN WORKSPACE */}
-      <div className={`chat-panel h-full flex-col bg-slate-950/20 relative ${mobileView === 'sidebar' ? 'mobile-hidden' : ''}`}>
+      <div className={`chat-panel h-full flex-col relative transition-colors ${
+        isLight ? 'bg-slate-100/60' : 'bg-slate-950/20'
+      } ${mobileView === 'sidebar' ? 'mobile-hidden' : ''}`}>
         {activeChat ? (
           <>
             {/* Active Chat Header */}
-            <div className="h-16 px-3 border-b border-slate-800 flex items-center justify-between bg-slate-900/30 backdrop-blur-md relative z-10">
+            <div className={`h-16 px-3 border-b flex items-center justify-between backdrop-blur-md relative z-10 transition-colors ${
+              isLight ? 'bg-white/90 border-slate-200 text-slate-900 shadow-xs' : 'bg-slate-900/30 border-slate-800 text-slate-100'
+            }`}>
               <div className="flex items-center gap-2 min-w-0">
                 {/* Mobile Back Button */}
                 <button
                   onClick={() => setMobileView('sidebar')}
-                  className="chat-back-btn p-2 hover:bg-slate-800 rounded-xl transition text-slate-400 hover:text-slate-100 cursor-pointer shrink-0"
+                  className={`chat-back-btn p-2 rounded-xl transition cursor-pointer shrink-0 ${
+                    isLight ? 'hover:bg-slate-200 text-slate-600' : 'hover:bg-slate-800 text-slate-400 hover:text-slate-100'
+                  }`}
                   title="Back"
                 >
                   <ArrowLeft className="w-4 h-4" />
@@ -998,14 +1334,18 @@ export default function Chat() {
                 <button
                   onClick={() => startCall(activeChat.id, 'audio')}
                   title="Voice Call"
-                  className="p-2 hover:bg-slate-800 rounded-xl transition text-slate-400 hover:text-slate-100 cursor-pointer"
+                  className={`p-2 rounded-xl transition cursor-pointer ${
+                    isLight ? 'hover:bg-slate-200 text-slate-600' : 'hover:bg-slate-800 text-slate-400 hover:text-slate-100'
+                  }`}
                 >
                   <Phone className="w-4 h-4" />
                 </button>
                 <button
                   onClick={() => startCall(activeChat.id, 'video')}
                   title="Video Call"
-                  className="p-2 hover:bg-slate-800 rounded-xl transition text-slate-400 hover:text-slate-100 cursor-pointer"
+                  className={`p-2 rounded-xl transition cursor-pointer ${
+                    isLight ? 'hover:bg-slate-200 text-slate-600' : 'hover:bg-slate-800 text-slate-400 hover:text-slate-100'
+                  }`}
                 >
                   <VideoIcon className="w-4 h-4" />
                 </button>
@@ -1020,7 +1360,18 @@ export default function Chat() {
             </div>
 
             {/* Message History Feed */}
-            <div className="chat-messages-feed flex-1 overflow-y-auto p-3 md:p-6 space-y-4 bg-slate-950/40 relative" style={{minHeight: 0}}>
+            <div className="chat-messages-feed flex-1 overflow-y-auto p-3 md:p-6 space-y-4 relative" style={{minHeight: 0}}>
+              {/* Background wallpaper layer if applied */}
+              {activeWallpaper && (
+                <div
+                  className="absolute inset-0 bg-cover bg-center transition-opacity duration-300 pointer-events-none z-0"
+                  style={{
+                    backgroundImage: `url(${activeWallpaper})`,
+                    opacity: wallpaperDim,
+                  }}
+                />
+              )}
+
               {messages.map((msg, index) => {
                 const isMe = msg.sender_id === user?.id
                 const hasAttachment = msg.attachments && msg.attachments.length > 0
@@ -1032,7 +1383,7 @@ export default function Chat() {
                 return (
                   <div
                     key={msg.id || index}
-                    className={`flex w-full group relative ${isMe ? 'justify-end' : 'justify-start'}`}
+                    className={`flex w-full group relative z-10 ${isMe ? 'justify-end' : 'justify-start'}`}
                   >
                     
                     {/* Inner column: flex-col so username sits above bubble */}
@@ -1047,7 +1398,14 @@ export default function Chat() {
                     {/* Message Bubble container - flex-row-reverse so outgoing bubbles hug the right edge */}
                     <div className={`flex items-end gap-1.5 ${isMe ? 'flex-row-reverse' : 'flex-row'}`}>
                       
-                      <div className={`p-3 rounded-2xl shadow-md transition relative hover:shadow-lg ${isMe ? 'bg-indigo-600 text-slate-50 rounded-br-xs' : 'bg-slate-900 border border-slate-800 text-slate-100 rounded-bl-xs'}`}>
+                      <div 
+                        className={`p-3 rounded-2xl shadow-md transition relative hover:shadow-lg ${
+                          isMe 
+                            ? `bg-gradient-to-r ${currentAccent.gradient} rounded-br-xs` 
+                            : (isLight ? 'bg-white border border-slate-200 text-slate-900 rounded-bl-xs' : 'bg-slate-900 border border-slate-800 text-slate-100 rounded-bl-xs')
+                        }`}
+                        style={isMe ? { color: bubbleTextColor } : {}}
+                      >
                         
                         {/* Reply Context Header */}
                         {msg.reply_to && (
@@ -1089,11 +1447,16 @@ export default function Chat() {
 
                         {/* Message Text (if text or emoji, or as description for files) */}
                         {msg.message_type === 'text' || msg.message_type === 'emoji' ? (
-                          <p className="text-sm whitespace-pre-wrap leading-relaxed break-words">{msg.message}</p>
+                          <p 
+                            className={`${currentFontSize.class} whitespace-pre-wrap leading-relaxed break-words font-medium`}
+                            style={isMe ? { color: bubbleTextColor } : {}}
+                          >
+                            {msg.message}
+                          </p>
                         ) : null}
 
                         {/* Footer (Edited badge, Checkmarks, Timestamp) */}
-                        <div className="flex justify-end items-center gap-1.5 mt-1.5 text-[9px] text-slate-350 opacity-80">
+                        <div className="flex justify-end items-center gap-1.5 mt-1.5 text-[9px] opacity-80">
                           {msg.edited_at && <span className="font-semibold italic text-[8px]">(edited)</span>}
                           <span>{formatTime(msg.created_at)}</span>
                           
@@ -1169,11 +1532,15 @@ export default function Chat() {
             )}
 
             {/* Input Action Controls Footer */}
-            <div className="px-2 sm:px-4 py-2 sm:py-3 border-t border-slate-800 bg-slate-900/50 flex flex-col gap-2 shrink-0">
+            <div className={`px-2 sm:px-4 py-2 sm:py-3 border-t flex flex-col gap-2 shrink-0 transition-colors ${
+              isLight ? 'bg-white/95 border-slate-200' : 'bg-slate-900/50 border-slate-800'
+            }`}>
               
               {/* Emoji Picker Row */}
               {showEmojiPicker && (
-                <div className="flex flex-wrap gap-2 p-2 bg-slate-950 border border-slate-850 rounded-xl max-w-sm self-start shadow-xl z-20">
+                <div className={`flex flex-wrap gap-2 p-2 border rounded-xl max-w-sm self-start shadow-xl z-20 ${
+                  isLight ? 'bg-white border-slate-200' : 'bg-slate-950 border-slate-850'
+                }`}>
                   {emojis.map(emoji => (
                     <button
                       key={emoji}
@@ -1181,7 +1548,9 @@ export default function Chat() {
                         setText(prev => prev + emoji)
                         setShowEmojiPicker(false)
                       }}
-                      className="text-lg p-1.5 hover:bg-slate-800 rounded-lg transition"
+                      className={`text-lg p-1.5 rounded-lg transition cursor-pointer ${
+                        isLight ? 'hover:bg-slate-100' : 'hover:bg-slate-800'
+                      }`}
                     >
                       {emoji}
                     </button>
@@ -1196,7 +1565,9 @@ export default function Chat() {
                   type="button"
                   onClick={() => fileInputRef.current?.click()}
                   title="Attach File"
-                  className="shrink-0 p-2 sm:p-2.5 hover:bg-slate-800 rounded-xl text-slate-400 hover:text-slate-100 transition cursor-pointer"
+                  className={`shrink-0 p-2 sm:p-2.5 rounded-xl transition cursor-pointer ${
+                    isLight ? 'hover:bg-slate-100 text-slate-600 hover:text-slate-900' : 'hover:bg-slate-800 text-slate-400 hover:text-slate-100'
+                  }`}
                 >
                   <Paperclip className="w-4.5 h-4.5" />
                   <input
@@ -1212,7 +1583,9 @@ export default function Chat() {
                   type="button"
                   onClick={() => setShowEmojiPicker(!showEmojiPicker)}
                   title="Emoji Picker"
-                  className="shrink-0 p-2 sm:p-2.5 hover:bg-slate-800 rounded-xl text-slate-400 hover:text-slate-100 transition cursor-pointer"
+                  className={`shrink-0 p-2 sm:p-2.5 rounded-xl transition cursor-pointer ${
+                    isLight ? 'hover:bg-slate-100 text-slate-600 hover:text-slate-900' : 'hover:bg-slate-800 text-slate-400 hover:text-slate-100'
+                  }`}
                 >
                   <Smile className="w-4.5 h-4.5" />
                 </button>
@@ -1271,7 +1644,9 @@ export default function Chat() {
                         }, 250)
                       }}
                       placeholder={editMessageId ? "Edit message..." : "Type a message..."}
-                      className="min-w-0 flex-1 bg-slate-950/50 border border-slate-800 focus:outline-none focus:border-indigo-500 px-3 sm:px-4 py-2 sm:py-2.5 rounded-xl text-base sm:text-sm"
+                      className={`min-w-0 flex-1 border focus:outline-none focus:border-indigo-500 px-3 sm:px-4 py-2 sm:py-2.5 rounded-xl text-base sm:text-sm transition-colors ${
+                        isLight ? 'bg-slate-100 border-slate-200 text-slate-900 placeholder-slate-400' : 'bg-slate-950/50 border-slate-800 text-slate-100 placeholder-slate-500'
+                      }`}
                     />
 
                     {/* Mic Trigger */}
@@ -1279,16 +1654,18 @@ export default function Chat() {
                       type="button"
                       onClick={startVoiceRecording}
                       title="Record Voice Note"
-                      className="shrink-0 p-2 sm:p-2.5 bg-slate-850/80 hover:bg-indigo-600/20 text-indigo-400 hover:text-indigo-300 border border-slate-750/70 hover:border-indigo-500/40 rounded-xl transition cursor-pointer shadow-sm flex items-center justify-center"
+                      className={`shrink-0 p-2 sm:p-2.5 border rounded-xl transition cursor-pointer shadow-sm flex items-center justify-center ${
+                        isLight ? 'bg-slate-100 hover:bg-slate-200 text-slate-600 border-slate-200' : 'bg-slate-850/80 hover:bg-indigo-600/20 text-indigo-400 hover:text-indigo-300 border-slate-750/70 hover:border-indigo-500/40'
+                      }`}
                     >
                       <Mic className="w-4.5 h-4.5" />
                     </button>
 
-                    {/* Send Button */}
+                    {/* Send Button with custom accent */}
                     <button
                       type="submit"
                       title="Send Message"
-                      className="shrink-0 p-2 sm:p-2.5 bg-indigo-500 hover:bg-indigo-600 text-white rounded-xl transition cursor-pointer shadow-lg shadow-indigo-500/20 flex items-center justify-center"
+                      className={`shrink-0 p-2 sm:p-2.5 bg-gradient-to-r ${currentAccent.gradient} text-white rounded-xl transition cursor-pointer shadow-lg ${currentAccent.glow} flex items-center justify-center hover:opacity-95 active:scale-95`}
                     >
                       <Send className="w-4.5 h-4.5" />
                     </button>
@@ -1662,4 +2039,3 @@ export default function Chat() {
     </div>
   )
 }
-

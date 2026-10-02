@@ -23,6 +23,10 @@
     display: none !important;
   }
 
+  .chat-nav-rail {
+    display: none !important;
+  }
+
   /* CHAT PANEL: full screen on mobile, flex column so input sticks to bottom */
   .chat-panel {
     display: flex !important;
@@ -74,6 +78,13 @@
 
 /* On desktop (>= 768px): both panels shown side by side */
 @media (min-width: 768px) {
+  .chat-nav-rail {
+    width: 72px;
+    display: flex !important;
+    flex-direction: column;
+    flex-shrink: 0;
+  }
+
   .chat-sidebar {
     width: 360px;
     display: flex !important;
@@ -90,4 +101,11 @@
   .chat-back-btn {
     display: none !important;
   }
+}
+
+/* ── Chat Font Family (controlled via --chat-font-family CSS var from ThemeContext) ── */
+.chat-messages-feed p,
+.chat-messages-feed span,
+.chat-messages-feed div {
+  font-family: var(--chat-font-family, 'Inter', sans-serif);
 }

@@ -1,21 +1,19 @@
 import react from '@vitejs/plugin-react'
 import { defineConfig } from 'vite'
 import tailwindcss from '@tailwindcss/vite'
-import mkcert from 'vite-plugin-mkcert'
 
 // https://vite.dev/config/
 export default defineConfig({
   plugins: [
     react(),
     tailwindcss(),
-    mkcert(),
   ],
   server: {
-    host: true,
+    host: 'localhost',
     port: 5173,
+    open: true,
     proxy: {
-      // Proxy all backend API routes through Vite so they work on HTTPS
-      // (browsers block HTTP requests from HTTPS pages = "mixed content")
+      // Proxy backend API routes to avoid CORS issues
       '/auth': { target: 'http://127.0.0.1:8000', changeOrigin: true },
       '/users': { target: 'http://127.0.0.1:8000', changeOrigin: true },
       '/chats': { target: 'http://127.0.0.1:8000', changeOrigin: true },

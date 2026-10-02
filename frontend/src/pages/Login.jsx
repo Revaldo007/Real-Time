@@ -1,76 +1,66 @@
 import React, { useState, useContext, useEffect, useRef } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { AuthContext } from '../context/AuthContext'
-import { 
-  MoreVertical, Globe, ChevronDown, 
-  ArrowLeft, QrCode, Sparkles, 
-  RefreshCw, Loader2, AlertCircle 
+import {
+  MoreVertical, Globe, ChevronDown,
+  ArrowLeft, QrCode, Sparkles,
+  RefreshCw, Loader2, AlertCircle,
+  MessageSquare, Shield, Zap, Lock
 } from 'lucide-react'
 import conversationGif from '../assets/Conversation.gif'
+import DeveloperBadge from '../components/DeveloperBadge'
 
 const COUNTRIES = [
-  { name: 'India', code: '+91' },
-  { name: 'United States / Global', code: '+1' },
-  { name: 'United Kingdom', code: '+44' },
-  { name: 'Colombia', code: '+57' },
-  { name: 'Brazil', code: '+55' },
-  { name: 'Mexico', code: '+52' },
-  { name: 'Germany', code: '+49' },
-  { name: 'France', code: '+33' },
-  { name: 'Canada', code: '+1' },
-  { name: 'Australia', code: '+61' },
-  { name: 'Spain', code: '+34' },
-  { name: 'Italy', code: '+39' },
-  { name: 'Japan', code: '+81' },
-  { name: 'South Korea', code: '+82' },
-  { name: 'United Arab Emirates', code: '+971' },
+  { name: 'India', flag: '🇮🇳', code: '+91' },
+  { name: 'United States', flag: '🇺🇸', code: '+1' },
+  { name: 'United Kingdom', flag: '🇬🇧', code: '+44' },
+  { name: 'Brazil', flag: '🇧🇷', code: '+55' },
+  { name: 'Canada', flag: '🇨🇦', code: '+1' },
+  { name: 'Australia', flag: '🇦🇺', code: '+61' },
+  { name: 'Germany', flag: '🇩🇪', code: '+49' },
+  { name: 'France', flag: '🇫🇷', code: '+33' },
+  { name: 'Japan', flag: '🇯🇵', code: '+81' },
+  { name: 'South Korea', flag: '🇰🇷', code: '+82' },
+  { name: 'UAE', flag: '🇦🇪', code: '+971' },
+  { name: 'Mexico', flag: '🇲🇽', code: '+52' },
+  { name: 'Spain', flag: '🇪🇸', code: '+34' },
+  { name: 'Italy', flag: '🇮🇹', code: '+39' },
+  { name: 'Colombia', flag: '🇨🇴', code: '+57' },
+]
+
+const FEATURE_PILLS = [
+  { icon: Shield, label: 'End-to-End Encrypted' },
+  { icon: Zap,    label: 'Real-Time Messaging' },
+  { icon: Lock,   label: 'Private & Secure' },
 ]
 
 export default function Login() {
   const { login } = useContext(AuthContext)
-  const navigate = useNavigate()
+  const navigate  = useNavigate()
 
-  // Steps:
-  // 1 = Welcome
-  // 2 = Phone number (WhatsApp-style)
-  // 3 = SMS OTP verification (Accepts 123456 or any 6-digit code)
-  // 4 = QR code companion device
   const [step, setStep] = useState(1)
-
-  // Phone Form State
-  const [selectedCountry, setSelectedCountry] = useState(COUNTRIES[0]) // India by default
-  const [countryCode, setCountryCode] = useState('+91')
-  const [phoneNumber, setPhoneNumber] = useState('')
-
-  // OTP Form State
-  const [otp, setOtp] = useState(['', '', '', '', '', ''])
-  const [error, setError] = useState('')
-  const [loading, setLoading] = useState(false)
-
-  // Resend countdown
-  const [countdown, setCountdown] = useState(0)
+  const [selectedCountry, setSelectedCountry] = useState(COUNTRIES[0])
+  const [countryCode, setCountryCode]   = useState('+91')
+  const [phoneNumber, setPhoneNumber]   = useState('')
+  const [otp, setOtp]                   = useState(['', '', '', '', '', ''])
+  const [error, setError]               = useState('')
+  const [loading, setLoading]           = useState(false)
+  const [countdown, setCountdown]       = useState(0)
+  const [showMenu, setShowMenu]         = useState(false)
+  const [showCountryPicker, setShowCountryPicker] = useState(false)
   const countdownRef = useRef(null)
 
-  // Dropdown states
-  const [showMenu, setShowMenu] = useState(false)
-  const [showCountryPicker, setShowCountryPicker] = useState(false)
-
-  // ── Helper: Full formatted phone number ─────────────────────────────────────
   const getFullPhone = () => {
-    const cleanDigits = phoneNumber.replace(/\D/g, '').replace(/^0+/, '')
-    return `${countryCode}${cleanDigits}`
+    const clean = phoneNumber.replace(/\D/g, '').replace(/^0+/, '')
+    return `${countryCode}${clean}`
   }
 
-  // ── Countdown timer helpers ────────────────────────────────────────────────
   const startCountdown = () => {
     setCountdown(60)
     clearInterval(countdownRef.current)
     countdownRef.current = setInterval(() => {
       setCountdown(prev => {
-        if (prev <= 1) {
-          clearInterval(countdownRef.current)
-          return 0
-        }
+        if (prev <= 1) { clearInterval(countdownRef.current); return 0 }
         return prev - 1
       })
     }, 1000)
@@ -78,252 +68,327 @@ export default function Login() {
 
   useEffect(() => () => clearInterval(countdownRef.current), [])
 
-  const handleCountrySelect = (country) => {
-    setSelectedCountry(country)
-    setCountryCode(country.code)
+  const handleCountrySelect = (c) => {
+    setSelectedCountry(c)
+    setCountryCode(c.code)
     setShowCountryPicker(false)
   }
 
-  // ── STEP 2: Phone Submit ───────────────────────────────────────────────────
   const handlePhoneSubmit = (e) => {
     e?.preventDefault()
-    const cleanDigits = phoneNumber.replace(/\D/g, '')
-    if (!cleanDigits || cleanDigits.length < 4) {
-      setError('Please enter a valid phone number')
-      return
-    }
+    const clean = phoneNumber.replace(/\D/g, '')
+    if (!clean || clean.length < 4) { setError('Please enter a valid phone number'); return }
     setError('')
     setOtp(['', '', '', '', '', ''])
     setStep(3)
     startCountdown()
   }
 
-  // ── STEP 3: Resend SMS ─────────────────────────────────────────────────────
   const handleResend = () => {
     if (countdown > 0) return
     setError('')
     startCountdown()
   }
 
-  // ── STEP 3: Verify OTP ─────────────────────────────────────────────────────
   const handleOtpSubmit = async (e) => {
     e?.preventDefault()
     const code = otp.join('')
-    if (code.length < 6) {
-      setError('Please enter the complete 6-digit code.')
-      return
-    }
+    if (code.length < 6) { setError('Please enter the complete 6-digit code.'); return }
     setError('')
     setLoading(true)
-
-    const fullPhone = getFullPhone()
-
     try {
-      const ok = await login(fullPhone)
-      if (ok) {
-        navigate('/')
-        return
-      }
+      const ok = await login(getFullPhone())
+      if (ok) { navigate('/'); return }
     } catch (err) {
-      setError(typeof err === 'string' ? err : (err.response?.data?.detail || 'Authentication failed. Please try again.'))
-    } finally {
-      setLoading(false)
-    }
+      setError(typeof err === 'string' ? err : (err.response?.data?.detail || 'Authentication failed. Try again.'))
+    } finally { setLoading(false) }
   }
 
-  // Auto-fill convenience method
   const handleAutoFill = () => {
-    const defaultCode = ['1', '2', '3', '4', '5', '6']
-    setOtp(defaultCode)
+    setOtp(['1','2','3','4','5','6'])
     setError('')
-    setTimeout(() => {
-      document.getElementById('otp-5')?.focus()
-    }, 50)
+    setTimeout(() => document.getElementById('otp-5')?.focus(), 50)
   }
 
-  // ── OTP input helpers ──────────────────────────────────────────────────────
   const handleOtpChange = (index, value) => {
     if (!/^\d*$/.test(value)) return
     if (value.length > 1) value = value[value.length - 1]
-    const newOtp = [...otp]
-    newOtp[index] = value
-    setOtp(newOtp)
-
-    if (value && index < 5) {
-      document.getElementById(`otp-${index + 1}`)?.focus()
-    }
+    const next = [...otp]; next[index] = value; setOtp(next)
+    if (value && index < 5) document.getElementById(`otp-${index + 1}`)?.focus()
   }
 
   const handleOtpKeyDown = (index, e) => {
-    if (e.key === 'Backspace' && !otp[index] && index > 0) {
+    if (e.key === 'Backspace' && !otp[index] && index > 0)
       document.getElementById(`otp-${index - 1}`)?.focus()
-    } else if (e.key === 'Enter') {
-      handleOtpSubmit()
-    }
+    else if (e.key === 'Enter') handleOtpSubmit()
   }
 
   const handleOtpPaste = (e) => {
     const pasted = e.clipboardData.getData('text').replace(/\D/g, '').slice(0, 6)
-    if (pasted.length === 6) {
-      setOtp(pasted.split(''))
-      document.getElementById('otp-5')?.focus()
-    }
+    if (pasted.length === 6) { setOtp(pasted.split('')); document.getElementById('otp-5')?.focus() }
     e.preventDefault()
   }
 
-  // ── Render ─────────────────────────────────────────────────────────────────
+  // ── SHARED CARD WRAPPER ────────────────────────────────────────────────────
+  const Card = ({ children, className = '' }) => (
+    <div className={`w-full max-w-sm bg-slate-900/80 backdrop-blur-xl border border-slate-700/60 rounded-3xl shadow-2xl shadow-black/50 overflow-hidden ${className}`}>
+      {children}
+    </div>
+  )
+
+  // ── RENDER ─────────────────────────────────────────────────────────────────
   return (
-    <div className="relative w-full h-full min-h-screen flex flex-col items-center justify-between bg-[#eef7ef] overflow-y-auto overflow-x-hidden p-3 sm:p-5 md:p-6 font-sans text-slate-800 selection:bg-emerald-200">
-      {/* Decorative background shapes */}
-      <div className="absolute top-12 left-1/4 w-0 h-0 border-l-[15px] border-l-transparent border-r-[15px] border-r-transparent border-b-[26px] border-b-emerald-200/60 rotate-45 pointer-events-none" />
-      <div className="absolute bottom-20 left-10 w-0 h-0 border-l-[20px] border-l-transparent border-r-[20px] border-r-transparent border-b-[35px] border-b-emerald-200/50 -rotate-12 pointer-events-none" />
-      <div className="absolute top-1/3 right-12 w-0 h-0 border-l-[18px] border-l-transparent border-r-[18px] border-r-transparent border-b-[32px] border-b-emerald-200/40 rotate-[130deg] pointer-events-none" />
+    <div className="relative w-full h-screen flex flex-col items-center justify-center overflow-hidden bg-slate-950 selection:bg-indigo-500/30 p-4">
 
-      {/* Page Header Title */}
-      <header className="relative z-10 text-center px-2 max-w-2xl mb-2 sm:mb-4 animate-fadeIn shrink-0">
-        <h1 className="text-base sm:text-xl md:text-2xl lg:text-3xl font-extrabold tracking-tight text-slate-800 leading-snug">
-          Real-Time Chat and Collaboration Platform with WebRTC Integration
-        </h1>
-        <div className="mt-1.5 sm:mt-2 mx-auto h-1 w-20 sm:w-28 bg-gradient-to-r from-emerald-400 via-[#00a884] to-teal-500 rounded-full shadow-xs" />
-      </header>
+      {/* ── Animated background orbs ──────────────────────────────────────── */}
+      <div className="pointer-events-none absolute inset-0 overflow-hidden">
+        <div className="absolute -top-40 -left-40 w-[500px] h-[500px] rounded-full bg-indigo-600/10 blur-[100px] animate-pulse" />
+        <div className="absolute -bottom-40 -right-40 w-[600px] h-[600px] rounded-full bg-violet-600/10 blur-[120px] animate-pulse" style={{ animationDelay: '1.5s' }} />
+        <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[400px] h-[400px] rounded-full bg-indigo-500/5 blur-[80px]" />
+        {/* Grid pattern overlay */}
+        <div
+          className="absolute inset-0 opacity-[0.03]"
+          style={{
+            backgroundImage: 'linear-gradient(rgba(99,102,241,0.8) 1px, transparent 1px), linear-gradient(90deg, rgba(99,102,241,0.8) 1px, transparent 1px)',
+            backgroundSize: '50px 50px'
+          }}
+        />
+      </div>
 
-      {/* Main Container Card */}
-      <div className="relative z-10 w-full max-w-[390px] min-h-[480px] sm:min-h-[530px] my-auto bg-white rounded-2xl sm:rounded-3xl shadow-xl border border-slate-100 flex flex-col justify-between overflow-visible transition-all duration-300">
+      {/* ── Top page title ────────────────────────────────────────────────── */}
+      <div className="hidden lg:flex absolute top-8 inset-x-0 z-10 px-8 justify-center pointer-events-none">
+        <div className="relative inline-flex flex-col items-center pb-4">
+          {/* soft glow behind the text */}
+          <div className="absolute inset-x-8 top-1/2 -translate-y-1/2 h-10 bg-indigo-500/25 blur-3xl rounded-full" />
 
-        {/* ── STEP 1: WELCOME ─────────────────────────────────────────────── */}
+          <h1 className="relative text-2xl xl:text-[32px] font-black tracking-tight leading-tight text-transparent bg-clip-text bg-gradient-to-r from-indigo-400 via-fuchsia-200 to-violet-400 drop-shadow-[0_2px_20px_rgba(129,140,248,0.45)]">
+            Real-Time Chat and Collaboration Platform with{' '}
+            <span className="text-transparent bg-clip-text bg-gradient-to-r from-violet-300 to-indigo-300">WebRTC Integration</span>
+          </h1>
+
+          {/* gradient underline with centre dot */}
+          <div className="relative mt-3 w-full h-[3px] rounded-full bg-gradient-to-r from-transparent via-indigo-500 to-transparent shadow-[0_0_14px_rgba(99,102,241,0.8)]">
+            <span className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 w-2.5 h-2.5 rounded-full bg-violet-400 ring-4 ring-violet-500/25 shadow-[0_0_12px_rgba(167,139,250,0.9)]" />
+          </div>
+        </div>
+      </div>
+
+      {/* ── Left decorative panel (desktop) ───────────────────────────────── */}
+      <div className="hidden lg:flex absolute left-0 top-0 bottom-0 w-[42%] flex-col justify-center items-center px-12 gap-8">
+
+        {/* Animated mockup */}
+        <div className="relative w-64 h-64 flex items-center justify-center">
+          <div className="absolute inset-0 rounded-full bg-indigo-600/10 blur-2xl animate-pulse" />
+          <img
+            src={conversationGif || '/Conversation.gif'}
+            onError={(e) => { e.currentTarget.src = '/Conversation.gif' }}
+            alt="Chat illustration"
+            className="relative w-56 h-56 object-contain drop-shadow-2xl select-none pointer-events-none"
+          />
+        </div>
+
+        {/* Feature pills */}
+        <div className="flex flex-col gap-2.5 w-full max-w-[260px]">
+          {FEATURE_PILLS.map(({ icon: Icon, label }) => (
+            <div key={label} className="flex items-center gap-3 px-4 py-2.5 rounded-2xl bg-white/5 border border-white/8 backdrop-blur-sm">
+              <div className="w-7 h-7 rounded-xl bg-indigo-600/20 flex items-center justify-center text-indigo-400 shrink-0">
+                <Icon className="w-3.5 h-3.5" />
+              </div>
+              <span className="text-xs font-semibold text-slate-300">{label}</span>
+            </div>
+          ))}
+        </div>
+
+        {/* Page title */}
+        <div className="text-center max-w-xs">
+          <p className="text-xs text-slate-500 leading-relaxed">
+            Real-Time Chat and Collaboration Platform with WebRTC Integration
+          </p>
+        </div>
+      </div>
+
+      {/* ── Right: Auth card area ──────────────────────────────────────────── */}
+      <div className="relative z-10 flex flex-col items-center gap-6 w-full max-h-full overflow-y-auto py-4 lg:ml-auto lg:w-[58%] lg:pr-16 lg:pl-4">
+
+        {/* Mobile brand */}
+        <div className="lg:hidden flex items-center gap-3">
+          <div className="w-10 h-10 rounded-2xl bg-gradient-to-tr from-indigo-600 to-violet-600 flex items-center justify-center shadow-lg shadow-indigo-600/30">
+            <MessageSquare className="w-5 h-5 text-white" />
+          </div>
+          <div>
+            <span className="text-xl font-black text-white tracking-tight">Rivo</span>
+            <span className="ml-2 text-xs text-indigo-400 font-semibold">Messenger</span>
+          </div>
+        </div>
+
+        {/* ── STEP 1: WELCOME ───────────────────────────────────────────────── */}
         {step === 1 && (
-          <div className="flex-1 flex flex-col justify-between p-4 sm:p-6 text-center animate-fadeIn">
-            <div className="relative">
-              <div className="flex justify-end items-center h-7 sm:h-8">
+          <Card>
+            {/* Gradient top bar */}
+            <div className="h-1 w-full bg-gradient-to-r from-indigo-600 via-violet-500 to-indigo-600" />
+
+            <div className="p-6 sm:p-8 flex flex-col items-center gap-6">
+              {/* Menu button */}
+              <div className="w-full flex justify-end relative">
                 <button
                   onClick={() => setShowMenu(!showMenu)}
-                  className="p-1 rounded-full text-slate-500 hover:bg-slate-100 transition"
-                  aria-label="Menu"
+                  className="p-1.5 rounded-xl text-slate-400 hover:text-slate-200 hover:bg-slate-800 transition cursor-pointer"
                 >
-                  <MoreVertical className="w-5 h-5" />
+                  <MoreVertical className="w-4 h-4" />
                 </button>
+                {showMenu && (
+                  <div className="absolute right-0 top-8 w-44 bg-slate-800 border border-slate-700 rounded-2xl shadow-2xl z-50 py-1.5 overflow-hidden">
+                    {['Help', 'Privacy Policy', 'Terms of Service'].map(item => (
+                      <button key={item} onClick={() => setShowMenu(false)} className="w-full px-4 py-2.5 text-left text-xs text-slate-300 hover:bg-slate-700 hover:text-white transition cursor-pointer">
+                        {item}
+                      </button>
+                    ))}
+                  </div>
+                )}
               </div>
-              {showMenu && (
-                <div className="absolute right-0 top-9 w-44 bg-white rounded-xl shadow-lg border border-slate-200 z-50 py-1 text-sm text-left">
-                  <button onClick={() => setShowMenu(false)} className="w-full px-4 py-2 hover:bg-slate-50">Help</button>
-                  <button onClick={() => setShowMenu(false)} className="w-full px-4 py-2 hover:bg-slate-50">Privacy Policy</button>
-                  <button onClick={() => setShowMenu(false)} className="w-full px-4 py-2 hover:bg-slate-50">Terms of Service</button>
-                </div>
-              )}
-            </div>
 
-            <div className="flex flex-col items-center my-auto px-2">
-              <div className="relative w-36 h-36 sm:w-44 sm:h-44 mb-3 sm:mb-5 flex items-center justify-center">
+              {/* Illustration (mobile only) */}
+              <div className="lg:hidden relative w-32 h-32 flex items-center justify-center">
+                <div className="absolute inset-0 rounded-full bg-indigo-600/15 blur-xl" />
                 <img
                   src={conversationGif || '/Conversation.gif'}
                   onError={(e) => { e.currentTarget.src = '/Conversation.gif' }}
-                  alt="Welcome to Rivo"
-                  className="w-full h-full object-contain select-none pointer-events-none"
+                  alt="Welcome"
+                  className="relative w-28 h-28 object-contain select-none pointer-events-none"
                 />
               </div>
 
-              <h1 className="text-xl sm:text-2xl font-bold text-slate-800 mb-2 sm:mb-3">Welcome to Rivo</h1>
-              <p className="text-xs text-slate-500 leading-relaxed px-2 sm:px-4">
-                Read our <span className="text-emerald-600 hover:underline cursor-pointer">Privacy Policy</span>. Tap "Agree and continue" to accept the <span className="text-emerald-600 hover:underline cursor-pointer">Terms of Service</span>.
-              </p>
-
-              <div className="mt-3 sm:mt-5 inline-flex items-center gap-1.5 px-3 py-1 bg-slate-50 border border-slate-200 rounded-full text-xs font-medium text-emerald-700 cursor-pointer hover:bg-slate-100 transition">
-                <Globe className="w-3.5 h-3.5" />
-                <span>English</span>
+              {/* Heading */}
+              <div className="text-center">
+                <h2 className="text-2xl sm:text-3xl font-black text-white tracking-tight leading-tight">
+                  Welcome to <span className="text-transparent bg-clip-text bg-gradient-to-r from-indigo-400 to-violet-400">Rivo</span>
+                </h2>
+                <p className="mt-2 text-sm text-slate-400 leading-relaxed max-w-xs mx-auto">
+                  Read our{' '}
+                  <span className="text-indigo-400 hover:text-indigo-300 cursor-pointer transition">Privacy Policy</span>.
+                  Tap <em>"Agree and continue"</em> to accept the{' '}
+                  <span className="text-indigo-400 hover:text-indigo-300 cursor-pointer transition">Terms of Service</span>.
+                </p>
               </div>
-            </div>
 
-            <div className="pt-3 pb-1 sm:pt-4 sm:pb-2">
+              {/* Language selector */}
+              <div className="inline-flex items-center gap-2 px-4 py-2 bg-slate-800/70 border border-slate-700/60 rounded-2xl text-xs font-semibold text-slate-300 cursor-pointer hover:bg-slate-800 hover:border-slate-600 transition">
+                <Globe className="w-3.5 h-3.5 text-indigo-400" />
+                <span>English</span>
+                <ChevronDown className="w-3 h-3 text-slate-500" />
+              </div>
+
+              {/* Feature pills (mobile) */}
+              <div className="lg:hidden w-full flex flex-col gap-2">
+                {FEATURE_PILLS.map(({ icon: Icon, label }) => (
+                  <div key={label} className="flex items-center gap-2.5 px-3.5 py-2 rounded-xl bg-slate-800/60 border border-slate-700/40">
+                    <div className="w-6 h-6 rounded-lg bg-indigo-600/20 flex items-center justify-center text-indigo-400 shrink-0">
+                      <Icon className="w-3 h-3" />
+                    </div>
+                    <span className="text-[11px] font-semibold text-slate-400">{label}</span>
+                  </div>
+                ))}
+              </div>
+
+              {/* CTA Button */}
               <button
                 onClick={() => setStep(2)}
-                className="w-full py-3 sm:py-3.5 bg-[#00a884] hover:bg-[#008f70] text-white font-medium rounded-full shadow-md transition-all active:scale-[0.98] text-sm cursor-pointer"
+                className="w-full py-3.5 bg-gradient-to-r from-indigo-600 to-violet-600 hover:from-indigo-500 hover:to-violet-500 text-white font-bold rounded-2xl shadow-lg shadow-indigo-600/30 transition-all active:scale-[0.98] text-sm cursor-pointer flex items-center justify-center gap-2"
               >
-                Agree and continue
+                <span>Agree and continue</span>
+                <span className="text-lg">→</span>
               </button>
+
+              <p className="text-[11px] text-slate-600 text-center">
+                Already have an account?{' '}
+                <span onClick={() => setStep(2)} className="text-indigo-400 hover:text-indigo-300 cursor-pointer font-semibold transition">Sign in</span>
+              </p>
             </div>
-          </div>
+          </Card>
         )}
 
-        {/* ── STEP 2: ENTER PHONE NUMBER (WhatsApp Style) ──────────────────── */}
+        {/* ── STEP 2: PHONE NUMBER ──────────────────────────────────────────── */}
         {step === 2 && (
-          <div className="flex-1 flex flex-col justify-between p-4 sm:p-6 animate-fadeIn relative">
-            <div>
-              <div className="flex justify-between items-center mb-6">
-                <button onClick={() => setStep(1)} className="p-1 rounded-full text-slate-600 hover:bg-slate-100 transition" aria-label="Back">
-                  <ArrowLeft className="w-5 h-5" />
+          <Card>
+            <div className="h-1 w-full bg-gradient-to-r from-indigo-600 via-violet-500 to-indigo-600" />
+            <div className="p-6 sm:p-8 flex flex-col gap-6">
+              {/* Header */}
+              <div className="flex items-center gap-3">
+                <button onClick={() => setStep(1)} className="p-2 rounded-xl text-slate-400 hover:text-white hover:bg-slate-800 transition cursor-pointer">
+                  <ArrowLeft className="w-4 h-4" />
                 </button>
-                <h2 className="text-base font-semibold text-emerald-700">Enter your phone number</h2>
-                <div className="relative">
-                  <button onClick={() => setShowMenu(!showMenu)} className="p-1 rounded-full text-slate-600 hover:bg-slate-100 transition" aria-label="Menu">
-                    <MoreVertical className="w-5 h-5" />
+                <div>
+                  <h2 className="text-lg font-bold text-white">Enter your number</h2>
+                  <p className="text-xs text-slate-400">We'll verify your phone to sign you in</p>
+                </div>
+                <div className="ml-auto relative">
+                  <button onClick={() => setShowMenu(!showMenu)} className="p-2 rounded-xl text-slate-400 hover:text-white hover:bg-slate-800 transition cursor-pointer">
+                    <MoreVertical className="w-4 h-4" />
                   </button>
                   {showMenu && (
-                    <div className="absolute right-0 top-8 w-56 bg-white rounded-xl shadow-lg border border-slate-100 py-2 z-50">
+                    <div className="absolute right-0 top-10 w-52 bg-slate-800 border border-slate-700 rounded-2xl shadow-2xl z-50 py-1.5 overflow-hidden">
                       <button
                         onClick={() => { setShowMenu(false); setStep(4) }}
-                        className="w-full text-left px-4 py-2.5 text-sm text-slate-700 hover:bg-slate-50 transition flex items-center gap-2"
+                        className="w-full text-left px-4 py-2.5 text-xs text-slate-300 hover:bg-slate-700 hover:text-white transition flex items-center gap-2 cursor-pointer"
                       >
-                        <QrCode className="w-4 h-4 text-emerald-600" />
-                        <span>Link as companion device</span>
+                        <QrCode className="w-4 h-4 text-indigo-400" /> Link as companion device
                       </button>
-                      <button onClick={() => setShowMenu(false)} className="w-full text-left px-4 py-2.5 text-sm text-slate-700 hover:bg-slate-50 transition">
-                        Help
-                      </button>
+                      <button onClick={() => setShowMenu(false)} className="w-full text-left px-4 py-2.5 text-xs text-slate-300 hover:bg-slate-700 hover:text-white transition cursor-pointer">Help</button>
                     </div>
                   )}
                 </div>
               </div>
 
-              <p className="text-xs text-slate-500 text-center mb-6 px-2 leading-relaxed">
-                Rivo will verify your phone number to access your account.
-              </p>
-
+              {/* Error */}
               {error && (
-                <div className="mb-4 p-3 bg-red-50 text-red-600 text-xs rounded-xl border border-red-100 text-center flex items-center justify-center gap-2">
-                  <AlertCircle className="w-4 h-4 shrink-0" />
-                  <span>{error}</span>
+                <div className="p-3 bg-rose-500/10 text-rose-400 text-xs rounded-2xl border border-rose-500/20 flex items-center gap-2">
+                  <AlertCircle className="w-4 h-4 shrink-0" /> {error}
                 </div>
               )}
 
-              {/* Phone Input Form */}
-              <form onSubmit={handlePhoneSubmit} className="space-y-4 max-w-xs mx-auto relative">
-                {/* Country Picker Button */}
-                <div 
+              {/* Phone form */}
+              <form onSubmit={handlePhoneSubmit} className="flex flex-col gap-4 relative">
+                {/* Country picker */}
+                <div
                   onClick={() => setShowCountryPicker(!showCountryPicker)}
-                  className="border-b-2 border-emerald-500 py-1.5 flex items-center justify-between cursor-pointer hover:bg-emerald-50/50 px-1 rounded-t-md transition"
+                  className="flex items-center justify-between px-4 py-3 bg-slate-800/80 border border-slate-700/60 rounded-2xl cursor-pointer hover:border-indigo-500/60 transition"
                 >
-                  <span className="text-sm font-medium text-slate-700">{selectedCountry.name}</span>
-                  <ChevronDown className={`w-4 h-4 text-emerald-600 transition-transform ${showCountryPicker ? 'rotate-180' : ''}`} />
+                  <div className="flex items-center gap-2">
+                    <span className="text-lg">{selectedCountry.flag}</span>
+                    <span className="text-sm text-slate-200 font-medium">{selectedCountry.name}</span>
+                  </div>
+                  <ChevronDown className={`w-4 h-4 text-slate-400 transition-transform ${showCountryPicker ? 'rotate-180' : ''}`} />
                 </div>
 
-                {/* Country Picker Dropdown */}
                 {showCountryPicker && (
-                  <div className="absolute top-10 left-0 w-full max-h-56 bg-white rounded-xl shadow-xl border border-slate-200 overflow-y-auto z-50 animate-in fade-in zoom-in-95 divide-y divide-slate-100">
+                  <div className="absolute top-[58px] left-0 w-full max-h-52 bg-slate-800 border border-slate-700 rounded-2xl shadow-2xl overflow-y-auto z-50">
                     {COUNTRIES.map((c, i) => (
                       <div
                         key={i}
                         onClick={() => handleCountrySelect(c)}
-                        className="px-4 py-2.5 hover:bg-emerald-50 flex items-center justify-between text-xs cursor-pointer transition"
+                        className="px-4 py-2.5 hover:bg-slate-700 flex items-center justify-between text-xs cursor-pointer transition"
                       >
-                        <span className="font-medium text-slate-700">{c.name}</span>
-                        <span className="text-emerald-700 font-semibold">{c.code}</span>
+                        <div className="flex items-center gap-2">
+                          <span className="text-base">{c.flag}</span>
+                          <span className="text-slate-200 font-medium">{c.name}</span>
+                        </div>
+                        <span className="text-indigo-400 font-bold">{c.code}</span>
                       </div>
                     ))}
                   </div>
                 )}
 
+                {/* Phone input row */}
                 <div className="flex gap-3">
-                  {/* Country Code Input */}
-                  <div className="w-20 border-b-2 border-emerald-500 py-2 flex items-center justify-center bg-transparent">
+                  <div className="w-20 px-3 py-3 bg-slate-800/80 border border-slate-700/60 rounded-2xl flex items-center justify-center hover:border-indigo-500/60 transition">
                     <input
                       type="text"
                       value={countryCode}
                       onChange={(e) => setCountryCode(e.target.value)}
-                      className="w-full text-center text-sm font-semibold text-slate-700 bg-transparent focus:outline-none"
+                      className="w-full text-center text-sm font-bold text-indigo-300 bg-transparent focus:outline-none"
                     />
                   </div>
-                  {/* Phone Number Input */}
-                  <div className="flex-1 border-b-2 border-emerald-500 py-2">
+                  <div className="flex-1 px-4 py-3 bg-slate-800/80 border border-slate-700/60 rounded-2xl hover:border-indigo-500/60 focus-within:border-indigo-500 transition">
                     <input
                       type="tel"
                       required
@@ -331,68 +396,66 @@ export default function Login() {
                       value={phoneNumber}
                       onChange={(e) => setPhoneNumber(e.target.value)}
                       placeholder="Phone number"
-                      className="w-full text-sm font-medium text-slate-800 placeholder-slate-400 bg-transparent focus:outline-none"
+                      className="w-full text-sm font-medium text-white placeholder-slate-500 bg-transparent focus:outline-none"
                     />
                   </div>
                 </div>
+
+                <button
+                  type="submit"
+                  disabled={loading}
+                  className="w-full py-3.5 bg-gradient-to-r from-indigo-600 to-violet-600 hover:from-indigo-500 hover:to-violet-500 text-white font-bold rounded-2xl shadow-lg shadow-indigo-600/25 transition-all active:scale-[0.98] text-sm cursor-pointer disabled:opacity-60 flex items-center justify-center gap-2"
+                >
+                  {loading ? <><Loader2 className="w-4 h-4 animate-spin" /> Sending…</> : 'Send OTP →'}
+                </button>
               </form>
             </div>
-
-            <div className="pt-4 pb-2">
-              <button
-                onClick={handlePhoneSubmit}
-                disabled={loading}
-                className="w-full py-3.5 bg-[#00a884] hover:bg-[#008f70] text-white font-medium rounded-full shadow-md transition-all active:scale-[0.98] text-sm cursor-pointer disabled:opacity-60 flex items-center justify-center gap-2"
-              >
-                {loading ? <><Loader2 className="w-4 h-4 animate-spin" /> Verifying…</> : 'Next'}
-              </button>
-            </div>
-          </div>
+          </Card>
         )}
 
-        {/* ── STEP 3: VERIFY OTP CODE (WHATSAPP-STYLE SMS VERIFICATION) ───────── */}
+        {/* ── STEP 3: OTP VERIFICATION ──────────────────────────────────────── */}
         {step === 3 && (
-          <div className="flex-1 flex flex-col justify-between p-4 sm:p-6 animate-fadeIn">
-            <div>
-              <div className="flex justify-between items-center mb-4 sm:mb-6">
-                <button onClick={() => setStep(2)} className="p-1 rounded-full text-slate-600 hover:bg-slate-100 transition" aria-label="Back">
-                  <ArrowLeft className="w-5 h-5" />
+          <Card>
+            <div className="h-1 w-full bg-gradient-to-r from-indigo-600 via-violet-500 to-indigo-600" />
+            <div className="p-6 sm:p-8 flex flex-col gap-6">
+              {/* Header */}
+              <div className="flex items-center gap-3">
+                <button onClick={() => setStep(2)} className="p-2 rounded-xl text-slate-400 hover:text-white hover:bg-slate-800 transition cursor-pointer">
+                  <ArrowLeft className="w-4 h-4" />
                 </button>
-                <h2 className="text-sm sm:text-base font-semibold text-emerald-700">Verifying your number</h2>
-                <div className="w-5" />
+                <div>
+                  <h2 className="text-lg font-bold text-white">Verify your number</h2>
+                  <p className="text-xs text-slate-400">
+                    Code sent to <span className="text-indigo-300 font-semibold">{countryCode} {phoneNumber}</span>
+                    {' '}·{' '}
+                    <span className="text-indigo-400 cursor-pointer hover:text-indigo-300 transition" onClick={() => setStep(2)}>Change</span>
+                  </p>
+                </div>
               </div>
 
-              <p className="text-xs text-slate-500 text-center mb-3 px-2 leading-relaxed">
-                Waiting to automatically detect an SMS sent to <span className="font-semibold text-slate-700">{countryCode} {phoneNumber}</span>.{' '}
-                <span className="text-emerald-600 hover:underline cursor-pointer font-medium" onClick={() => setStep(2)}>
-                  Wrong number?
-                </span>
-              </p>
-
+              {/* Error */}
               {error && (
-                <div className="mb-3 p-2.5 bg-red-50 text-red-600 text-xs rounded-xl border border-red-100 text-center flex items-center justify-center gap-2">
-                  <AlertCircle className="w-4 h-4 shrink-0" />
-                  <span>{error}</span>
+                <div className="p-3 bg-rose-500/10 text-rose-400 text-xs rounded-2xl border border-rose-500/20 flex items-center gap-2">
+                  <AlertCircle className="w-4 h-4 shrink-0" /> {error}
                 </div>
               )}
 
-              {/* Testing / Quick Access Banner */}
-              <div className="mb-3 p-2 bg-emerald-50/80 border border-emerald-200/70 text-emerald-900 text-xs rounded-xl flex items-center justify-between shadow-xs">
-                <div className="flex items-center gap-1.5">
-                  <Sparkles className="w-4 h-4 text-emerald-600 shrink-0" />
-                  <span className="text-slate-600 text-[11px] sm:text-xs">Type any code or use <strong className="text-emerald-700">123456</strong></span>
+              {/* Test hint */}
+              <div className="p-3 bg-indigo-500/10 border border-indigo-500/20 text-xs rounded-2xl flex items-center justify-between gap-3">
+                <div className="flex items-center gap-2 text-indigo-300">
+                  <Sparkles className="w-3.5 h-3.5 text-indigo-400 shrink-0" />
+                  <span>Use any code or <strong className="text-white">123456</strong></span>
                 </div>
                 <button
-                  type="button"
                   onClick={handleAutoFill}
-                  className="px-2 py-0.5 sm:px-2.5 sm:py-1 bg-[#00a884] hover:bg-[#008f70] text-white font-medium rounded-lg text-[11px] transition cursor-pointer shadow-xs"
+                  className="px-3 py-1 bg-indigo-600 hover:bg-indigo-500 text-white font-semibold rounded-xl text-[11px] transition cursor-pointer whitespace-nowrap"
                 >
                   Auto-fill
                 </button>
               </div>
 
-              {/* 6 Digit OTP Inputs */}
-              <div className="flex justify-center gap-1.5 sm:gap-2 my-3 sm:my-5" onPaste={handleOtpPaste}>
+              {/* OTP boxes */}
+              <div className="flex justify-center gap-2 sm:gap-3" onPaste={handleOtpPaste}>
                 {otp.map((digit, idx) => (
                   <input
                     key={idx}
@@ -404,86 +467,87 @@ export default function Login() {
                     autoFocus={idx === 0}
                     onChange={(e) => handleOtpChange(idx, e.target.value)}
                     onKeyDown={(e) => handleOtpKeyDown(idx, e)}
-                    className="w-9 h-11 sm:w-10 sm:h-12 text-center text-lg sm:text-xl font-bold border-b-2 border-slate-300 focus:border-emerald-500 bg-slate-50 rounded-t-md focus:outline-none transition selection:bg-transparent"
+                    className={`w-11 h-14 text-center text-xl font-black rounded-2xl border bg-slate-800/80 focus:outline-none transition-all selection:bg-transparent ${
+                      digit
+                        ? 'border-indigo-500 text-white bg-indigo-600/15 shadow-md shadow-indigo-600/20'
+                        : 'border-slate-700/60 text-slate-300 focus:border-indigo-500/80'
+                    }`}
                   />
                 ))}
               </div>
 
+              {/* Resend */}
               <div className="text-center">
                 {countdown > 0 ? (
-                  <p className="text-xs text-slate-400">Resend SMS in <span className="text-slate-600 font-semibold">{countdown}s</span></p>
+                  <p className="text-xs text-slate-500">
+                    Resend in <span className="text-indigo-400 font-bold tabular-nums">{countdown}s</span>
+                  </p>
                 ) : (
-                  <button
-                    onClick={handleResend}
-                    disabled={loading}
-                    className="inline-flex items-center gap-1 text-xs font-semibold text-emerald-600 hover:text-emerald-700 hover:underline cursor-pointer"
-                  >
-                    <RefreshCw className="w-3 h-3" /> Resend SMS
+                  <button onClick={handleResend} disabled={loading} className="inline-flex items-center gap-1.5 text-xs font-semibold text-indigo-400 hover:text-indigo-300 cursor-pointer transition">
+                    <RefreshCw className="w-3.5 h-3.5" /> Resend Code
                   </button>
                 )}
               </div>
-            </div>
 
-            <div className="pt-3 pb-1 sm:pt-4 sm:pb-2">
+              {/* Verify button */}
               <button
                 onClick={handleOtpSubmit}
                 disabled={loading || otp.join('').length < 6}
-                className="w-full py-3 sm:py-3.5 bg-[#00a884] hover:bg-[#008f70] text-white font-medium rounded-full shadow-md transition-all active:scale-[0.98] text-sm cursor-pointer disabled:opacity-50 flex items-center justify-center gap-2"
+                className="w-full py-3.5 bg-gradient-to-r from-indigo-600 to-violet-600 hover:from-indigo-500 hover:to-violet-500 text-white font-bold rounded-2xl shadow-lg shadow-indigo-600/25 transition-all active:scale-[0.98] text-sm cursor-pointer disabled:opacity-40 flex items-center justify-center gap-2"
               >
-                {loading ? <><Loader2 className="w-4 h-4 animate-spin" /> Verifying…</> : 'Verify & Continue'}
+                {loading ? <><Loader2 className="w-4 h-4 animate-spin" /> Verifying…</> : 'Verify & Sign In →'}
               </button>
             </div>
-          </div>
+          </Card>
         )}
 
-        {/* ── STEP 4: COMPANION DEVICE QR CODE ─────────────────────────────── */}
+        {/* ── STEP 4: QR CODE ───────────────────────────────────────────────── */}
         {step === 4 && (
-          <div className="flex-1 flex flex-col justify-between p-4 sm:p-6 animate-fadeIn">
-            <div>
-              <div className="flex justify-between items-center mb-4 sm:mb-6">
-                <button onClick={() => setStep(2)} className="p-1 rounded-full text-slate-600 hover:bg-slate-100 transition" aria-label="Back">
-                  <ArrowLeft className="w-5 h-5" />
+          <Card>
+            <div className="h-1 w-full bg-gradient-to-r from-indigo-600 via-violet-500 to-indigo-600" />
+            <div className="p-6 sm:p-8 flex flex-col gap-6">
+              <div className="flex items-center gap-3">
+                <button onClick={() => setStep(2)} className="p-2 rounded-xl text-slate-400 hover:text-white hover:bg-slate-800 transition cursor-pointer">
+                  <ArrowLeft className="w-4 h-4" />
                 </button>
-                <h2 className="text-sm sm:text-base font-semibold text-emerald-700">Link with QR code</h2>
-                <div className="w-5" />
+                <div>
+                  <h2 className="text-lg font-bold text-white">Link with QR Code</h2>
+                  <p className="text-xs text-slate-400">Scan using Rivo on your primary phone</p>
+                </div>
               </div>
 
-              <div className="flex flex-col items-center text-center">
-                <div className="p-3 sm:p-4 bg-white border-2 border-emerald-500 rounded-2xl shadow-md my-2 sm:my-4">
-                  <div className="w-40 h-40 sm:w-48 sm:h-48 bg-slate-900 rounded-lg flex items-center justify-center text-white relative overflow-hidden">
-                    <QrCode className="w-32 h-32 sm:w-40 sm:h-40 text-white opacity-90" />
-                    <div className="absolute inset-0 bg-emerald-500/10 pointer-events-none" />
+              <div className="flex flex-col items-center gap-4">
+                <div className="p-4 rounded-3xl bg-white shadow-2xl shadow-black/40">
+                  <div className="w-44 h-44 bg-slate-950 rounded-2xl flex items-center justify-center">
+                    <QrCode className="w-36 h-36 text-white" />
                   </div>
                 </div>
-                <h3 className="text-sm font-semibold text-slate-700 mb-1">Scan to link device</h3>
-                <p className="text-xs text-slate-500 px-4">
-                  Open Rivo on your primary phone, tap Menu &gt; Linked Devices, and scan this code.
+                <p className="text-xs text-slate-400 text-center px-4 leading-relaxed">
+                  Open Rivo on your primary device → Menu → Linked Devices → Scan this code
                 </p>
               </div>
-            </div>
 
-            <div className="pt-3 pb-1 sm:pt-4 sm:pb-2">
               <button
                 onClick={() => setStep(2)}
-                className="w-full py-2.5 sm:py-3 bg-slate-100 hover:bg-slate-200 text-slate-700 font-medium rounded-full transition-all text-sm cursor-pointer"
+                className="w-full py-3 bg-slate-800 hover:bg-slate-700 text-slate-200 font-semibold rounded-2xl transition text-sm cursor-pointer border border-slate-700"
               >
-                Back to Phone Input
+                ← Back to Phone Sign In
               </button>
             </div>
-          </div>
+          </Card>
         )}
 
+        {/* Sub-text under card */}
+        {step === 1 && (
+          <p className="text-xs text-slate-600 text-center max-w-xs">
+            Real-Time Chat Platform with WebRTC Integration
+          </p>
+        )}
       </div>
 
-      {/* Bottom-right Project Credits */}
-      <div className="fixed bottom-3 right-3 sm:bottom-5 sm:right-6 z-20 pointer-events-none select-none max-w-[200px] sm:max-w-xs">
-        <div className="bg-white/95 backdrop-blur-md px-3 py-1.5 sm:px-4 sm:py-2.5 rounded-xl sm:rounded-2xl shadow-md border border-emerald-100/80 text-right transition-all">
-          <p className="text-[11px] sm:text-xs md:text-sm font-bold text-slate-800 tracking-wide leading-tight">Asha Sherin</p>
-          <p className="text-[9px] sm:text-[10px] md:text-xs font-semibold text-emerald-600 leading-tight my-0.5 sm:my-1">guidance by</p>
-          <p className="text-[10px] sm:text-xs md:text-sm font-semibold text-slate-700 leading-tight">Jeba Malar(HOD)</p>
-        </div>
-      </div>
+      {/* ── Project Credits ────────────────────────────────────────────────── */}
+      <DeveloperBadge />
+
     </div>
   )
 }
-

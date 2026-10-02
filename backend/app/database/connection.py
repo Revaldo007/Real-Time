@@ -1,7 +1,7 @@
 from sqlalchemy import create_engine
 from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.orm import sessionmaker
-import psycopg2
+import psycopg
 from urllib.parse import urlparse
 from app.core.config import settings
 
@@ -13,7 +13,7 @@ def ensure_database_exists():
     
     try:
         # Attempt to connect to the target database
-        conn = psycopg2.connect(
+        conn = psycopg.connect(
             dbname=db_name,
             user=url.username,
             password=url.password,
@@ -21,18 +21,18 @@ def ensure_database_exists():
             port=url.port or 5432
         )
         conn.close()
-    except psycopg2.OperationalError as e:
+    except psycopg.OperationalError as e:
         # If the database doesn't exist, connect to postgres and create it
         if "does not exist" in str(e):
             try:
-                conn = psycopg2.connect(
+                conn = psycopg.connect(
                     dbname="postgres",
                     user=url.username,
                     password=url.password,
                     host=url.hostname,
-                    port=url.port or 5432
+                    port=url.port or 5432,
+                    autocommit=True
                 )
-                conn.autocommit = True
                 cursor = conn.cursor()
                 cursor.execute(f'CREATE DATABASE "{db_name}"')
                 cursor.close()
