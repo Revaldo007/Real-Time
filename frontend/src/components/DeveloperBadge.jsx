@@ -37,6 +37,11 @@ const css = `
   }
   .dev-bar { transform-origin: left; animation: dev-progress ${FACE_TIME}ms linear forwards; }
 
+  /* Smaller badge on small / short screens so it never covers the login card */
+  @media (max-width: 1023px), (max-height: 800px) { .dev-badge { zoom: 0.8; } }
+  @media (max-height: 650px) { .dev-badge { zoom: 0.65; } }
+  @media (max-width: 480px) { .dev-badge { zoom: 0.7; } }
+
   @media (prefers-reduced-motion: reduce) {
     .dev-badge, .dev-beam, .dev-bar { animation: none; }
     .dev-beam { opacity: .6; }

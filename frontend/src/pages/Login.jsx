@@ -138,7 +138,7 @@ export default function Login() {
 
   // ── RENDER ─────────────────────────────────────────────────────────────────
   return (
-    <div className="relative w-full h-screen flex flex-col items-center justify-center overflow-hidden bg-slate-950 selection:bg-indigo-500/30 p-4">
+    <div className="fixed inset-0 w-full h-full flex flex-col items-center justify-center overflow-hidden bg-slate-950 selection:bg-indigo-500/30 p-4">
 
       {/* Responsive layout rules (keep title, card and credit badge from colliding) */}
       <style>{`
@@ -149,7 +149,7 @@ export default function Login() {
         }
         /* Short desktop screens (laptops): compact everything */
         @media (min-width: 1024px) and (max-height: 800px) {
-          .login-title { top: 1.25rem !important; }
+          .login-title { top: 1.5rem !important; }
           .login-title h1 { font-size: 1.5rem !important; }
           .login-right { margin-top: 4.5rem; margin-bottom: 10rem; max-height: calc(100% - 14.5rem) !important; }
           .login-left  { gap: 1rem !important; top: 6rem !important; }
@@ -167,19 +167,6 @@ export default function Login() {
         /* Tablet / mobile: keep the card clear of the badge */
         @media (max-width: 1023px) {
           .login-right { margin-bottom: 8rem; max-height: calc(100% - 8rem) !important; }
-        }
-        /* Shrink the credit badge on small or short screens */
-        @media (max-width: 1023px), (max-height: 800px) {
-          .login-badge {
-            position: fixed; right: 0; bottom: 0; width: 0; height: 0;
-            transform: scale(0.75); transform-origin: bottom right; z-index: 50;
-          }
-        }
-        @media (max-height: 650px) {
-          .login-badge { transform: scale(0.55); }
-        }
-        @media (max-width: 480px) {
-          .login-badge { transform: scale(0.65); }
         }
       `}</style>
 
@@ -590,9 +577,7 @@ export default function Login() {
       </div>
 
       {/* ── Project Credits ────────────────────────────────────────────────── */}
-      <div className="login-badge">
-        <DeveloperBadge />
-      </div>
+      <DeveloperBadge />
 
     </div>
   )
