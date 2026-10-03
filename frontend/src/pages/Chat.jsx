@@ -169,6 +169,11 @@ export default function Chat() {
   const [groupDesc, setGroupDesc] = useState('')
   const [selectedGroupUsers, setSelectedGroupUsers] = useState([])
 
+  // Add-member (inside the group profile modal) states
+  const [showAddMembers, setShowAddMembers] = useState(false)
+  const [addMemberSelection, setAddMemberSelection] = useState([])
+  const [addingMembers, setAddingMembers] = useState(false)
+
   // Voice Note Recorder States
   const [isRecording, setIsRecording] = useState(false)
   const [isUploadingVoice, setIsUploadingVoice] = useState(false)
@@ -318,6 +323,30 @@ export default function Chat() {
       fetchChats()
     } catch (err) {
       console.error(err)
+    }
+  }
+
+  // Add members to an existing group
+  const handleAddMembers = async () => {
+    if (!avatarMenuChat?.id || addMemberSelection.length === 0) return
+    setAddingMembers(true)
+    try {
+      if (typeof chatsAPI.addMembers !== 'function') {
+        throw new Error('chatsAPI.addMembers is missing in services/api.js')
+      }
+      const res = await chatsAPI.addMembers(avatarMenuChat.id, addMemberSelection)
+      if (res?.data?.members) {
+        setAvatarMenuChat(res.data)
+        if (activeChat?.id === res.data.id) setActiveChat(res.data)
+      }
+      setShowAddMembers(false)
+      setAddMemberSelection([])
+      fetchChats()
+    } catch (err) {
+      console.error(err)
+      alert(err?.response?.data?.detail || err.message || 'Failed to add members')
+    } finally {
+      setAddingMembers(false)
     }
   }
 
@@ -545,6 +574,12 @@ export default function Chat() {
     return `${m}:${s}`
   }
 
+  // Reset the add-member picker whenever the profile modal switches chat / closes
+  useEffect(() => {
+    setShowAddMembers(false)
+    setAddMemberSelection([])
+  }, [avatarMenuChat?.id])
+
   // ── Keep panel headers clear of the project title bar ───────────────────
   // Measures how far the sidebar / chat panel reach up underneath the title
   // bar (e.g. when the global CSS pins them to the top of the window on small
@@ -585,6 +620,29 @@ export default function Chat() {
       {/* Keep mobile panels inside the area below the title bar
           (overrides any fixed / full-viewport positioning from the global CSS) */}
       <style>{`
+        /* ── Custom scrollbars (chat feed, sidebar lists, panels, modals) ── */
+        .chat-shell *::-webkit-scrollbar { width: 8px; height: 8px; }
+        .chat-shell *::-webkit-scrollbar-track { background: transparent; margin: 8px 0; }
+        .chat-shell *::-webkit-scrollbar-corner { background: transparent; }
+        .chat-shell *::-webkit-scrollbar-thumb {
+          background: linear-gradient(180deg, rgba(99,102,241,0.55), rgba(139,92,246,0.55));
+          border-radius: 999px;
+          border: 2px solid transparent;
+          background-clip: padding-box;
+          transition: background 0.2s;
+        }
+        .chat-shell *::-webkit-scrollbar-thumb:hover {
+          background: linear-gradient(180deg, #818cf8, #a78bfa);
+          background-clip: padding-box;
+        }
+        .chat-shell *::-webkit-scrollbar-thumb:active {
+          background: linear-gradient(180deg, #6366f1, #8b5cf6);
+          background-clip: padding-box;
+        }
+        /* Firefox (Chromium ignores ::-webkit-scrollbar if these are set, so scope them) */
+        @supports not selector(::-webkit-scrollbar) {
+          .chat-shell * { scrollbar-width: thin; scrollbar-color: rgba(129,140,248,0.6) transparent; }
+        }
         .chat-shell .chat-sidebar,
         .chat-shell .chat-panel { padding-top: var(--title-overlap, 0px) !important; }
         @media (max-width: 767px) {
@@ -707,6 +765,34 @@ export default function Chat() {
               </span>
             </div>
 
+            {/* 4. New Group */}
+            <div className="relative group w-full flex justify-center">
+              {showCreateGroup && (
+                <span className="absolute left-0 top-1/2 -translate-y-1/2 w-1 h-6 bg-violet-500 rounded-r-full shadow-sm shadow-violet-500" />
+              )}
+              <button
+                onClick={() => {
+                  setShowNewContact(false)
+                  setShowSelectContact(false)
+                  setShowCreateGroup(true)
+                }}
+                className={`w-11 h-11 rounded-2xl flex items-center justify-center transition-all cursor-pointer relative border ${
+                  showCreateGroup
+                    ? 'bg-violet-600/25 text-violet-300 border-violet-500/40 shadow-inner'
+                    : 'bg-gradient-to-tr from-violet-500/15 to-indigo-500/15 border-violet-500/40 text-violet-300 hover:border-violet-400/70 hover:from-violet-500/25 hover:to-indigo-500/25'
+                }`}
+                title="New Group"
+              >
+                <Users className="w-5 h-5" />
+                <span className="absolute -top-1 -right-1 w-4 h-4 bg-violet-500 text-white rounded-full flex items-center justify-center border-2 border-slate-950">
+                  <Plus className="w-2.5 h-2.5" strokeWidth={3} />
+                </span>
+              </button>
+              <span className="absolute left-full ml-3 px-2.5 py-1 bg-violet-950 text-violet-200 text-xs font-medium rounded-lg whitespace-nowrap opacity-0 group-hover:opacity-100 pointer-events-none transition-opacity shadow-xl border border-violet-500/30 z-50 flex items-center gap-1.5">
+                <Users className="w-3.5 h-3.5" /> New Group
+              </span>
+            </div>
+
           </div>
         </div>
 
@@ -781,6 +867,14 @@ export default function Chat() {
               </div>
               
               <div className="flex items-center gap-1.5">
+                {/* New Group button */}
+                <button
+                  onClick={() => setShowCreateGroup(true)}
+                  className="flex items-center justify-center w-8 h-8 bg-violet-500/15 hover:bg-violet-500/25 border border-violet-500/30 text-violet-300 hover:text-violet-200 rounded-xl transition cursor-pointer"
+                  title="New Group"
+                >
+                  <Users className="w-4 h-4" />
+                </button>
                 {/* Prominent Add User button */}
                 <button
                   onClick={() => setShowNewContact(true)}
@@ -1047,34 +1141,60 @@ export default function Chat() {
         )}
 
         {/* Mobile Bottom Navigation Bar (< 768px) */}
-        <div className="md:hidden mt-auto border-t border-slate-800 bg-slate-950/95 px-3 py-2 flex items-center justify-around z-20 shrink-0">
+        <div className="md:hidden mt-auto border-t border-slate-800 bg-slate-950/95 px-1 py-2 flex items-center justify-around z-20 shrink-0">
           <button
             onClick={() => { setSidebarTab('chats'); setShowNewContact(false); }}
-            className={`flex flex-col items-center gap-1 p-1.5 rounded-xl text-[11px] ${sidebarTab === 'chats' ? 'text-indigo-400 font-semibold' : 'text-slate-400'}`}
+            className={`flex-1 min-w-0 flex flex-col items-center gap-1 p-1 rounded-xl text-[10px] ${sidebarTab === 'chats' ? 'text-indigo-400 font-semibold' : 'text-slate-400'}`}
           >
             <MessageSquare className="w-5 h-5" />
             <span>Chats</span>
           </button>
           <button
             onClick={() => setShowNewContact(true)}
-            className="flex flex-col items-center gap-1 p-1.5 rounded-xl text-[11px] text-emerald-400 font-semibold"
+            className="flex-1 min-w-0 flex flex-col items-center gap-1 p-1 rounded-xl text-[10px] text-emerald-400 font-semibold"
           >
             <UserPlus className="w-5 h-5" />
             <span>Add User</span>
           </button>
           <button
             onClick={() => { setSidebarTab('contacts'); setShowNewContact(false); }}
-            className={`flex flex-col items-center gap-1 p-1.5 rounded-xl text-[11px] ${sidebarTab === 'contacts' ? 'text-indigo-400 font-semibold' : 'text-slate-400'}`}
+            className={`flex-1 min-w-0 flex flex-col items-center gap-1 p-1 rounded-xl text-[10px] ${sidebarTab === 'contacts' ? 'text-indigo-400 font-semibold' : 'text-slate-400'}`}
           >
             <Users className="w-5 h-5" />
             <span>Contacts</span>
           </button>
           <button
+            onClick={() => { setShowNewContact(false); setShowSelectContact(false); setShowCreateGroup(true) }}
+            className="flex-1 min-w-0 flex flex-col items-center gap-1 p-1 rounded-xl text-[10px] text-violet-300 font-semibold"
+          >
+            <span className="relative">
+              <Users className="w-5 h-5" />
+              <span className="absolute -top-1 -right-1.5 w-3.5 h-3.5 bg-violet-500 text-white rounded-full flex items-center justify-center">
+                <Plus className="w-2.5 h-2.5" strokeWidth={3} />
+              </span>
+            </span>
+            <span>Group</span>
+          </button>
+          <button
             onClick={() => navigate('/profile')}
-            className="flex flex-col items-center gap-1 p-1.5 rounded-xl text-[11px] text-slate-400"
+            className="flex-1 min-w-0 flex flex-col items-center gap-1 p-1 rounded-xl text-[10px] text-slate-400"
           >
             <User className="w-5 h-5" />
             <span>Profile</span>
+          </button>
+          <button
+            onClick={() => navigate('/settings')}
+            className="flex-1 min-w-0 flex flex-col items-center gap-1 p-1 rounded-xl text-[10px] text-slate-400"
+          >
+            <Settings className="w-5 h-5" />
+            <span>Settings</span>
+          </button>
+          <button
+            onClick={logout}
+            className="flex-1 min-w-0 flex flex-col items-center gap-1 p-1 rounded-xl text-[10px] text-rose-400"
+          >
+            <LogOut className="w-5 h-5" />
+            <span>Logout</span>
           </button>
         </div>
 
@@ -1174,6 +1294,17 @@ export default function Chat() {
                 {/* Quick Actions (only show when not searching) */}
                 {!showSelectContactSearch && (
                   <div className="p-2 space-y-1">
+                    {/* New Group Option */}
+                    <div
+                      onClick={() => { setShowCreateGroup(true); setShowSelectContact(false) }}
+                      className="flex items-center gap-4 p-3 hover:bg-slate-800/60 rounded-xl cursor-pointer transition"
+                    >
+                      <div className="w-10 h-10 rounded-full bg-gradient-to-tr from-emerald-500 to-teal-500 flex items-center justify-center text-white shadow-md shadow-emerald-500/20">
+                        <Users className="w-5 h-5" />
+                      </div>
+                      <span className="text-sm font-medium text-slate-100">New group</span>
+                    </div>
+
                     {/* New Contact Option */}
                     <div 
                       onClick={() => setShowNewContact(true)}
@@ -1429,8 +1560,9 @@ export default function Chat() {
             </div>
 
             {/* Message History Feed */}
-            <div className="chat-messages-feed flex-1 overflow-y-auto p-3 md:p-6 space-y-4 relative" style={{minHeight: 0}}>
-              {/* Background wallpaper layer if applied */}
+            <div className="relative flex-1 min-h-0 flex flex-col">
+              {/* Background wallpaper layer - lives OUTSIDE the scroller so it always
+                  fills the whole message area and never scrolls away with the messages */}
               {activeWallpaper && (
                 <div
                   className="absolute inset-0 bg-cover bg-center transition-opacity duration-300 pointer-events-none z-0"
@@ -1440,6 +1572,8 @@ export default function Chat() {
                   }}
                 />
               )}
+
+            <div className="chat-messages-feed flex-1 overflow-y-auto p-3 md:p-6 space-y-4 relative z-10" style={{minHeight: 0}}>
 
               {messages.map((msg, index) => {
                 const isMe = msg.sender_id === user?.id
@@ -1585,6 +1719,7 @@ export default function Chat() {
                 )
               })}
               <div ref={messagesEndRef} />
+            </div>
             </div>
 
             {/* Reply Preview Bar */}
@@ -1761,7 +1896,7 @@ export default function Chat() {
 
       {/* 3. GROUP CREATION DIALOG MODAL */}
       {showCreateGroup && (
-        <div className="absolute inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4">
+        <div className="absolute inset-x-0 bottom-0 top-12 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4 overflow-y-auto">
           <div className="w-full max-w-md p-6 bg-slate-900 border border-slate-800 rounded-3xl shadow-xl">
             <div className="flex justify-between items-center mb-4">
               <h2 className="text-lg font-bold font-outfit">Create New Group</h2>
@@ -1974,11 +2109,11 @@ export default function Chat() {
 
         return (
           <div 
-            className="fixed inset-0 z-50 bg-black/75 backdrop-blur-sm flex items-center justify-center p-4 animate-in fade-in duration-200"
+            className="fixed inset-x-0 bottom-0 top-12 z-50 bg-black/75 backdrop-blur-sm flex items-center justify-center p-4 animate-in fade-in duration-200"
             onClick={() => setAvatarMenuChat(null)}
           >
             <div 
-              className="relative w-full max-w-sm bg-slate-900 border border-slate-800 rounded-3xl overflow-hidden shadow-2xl p-6 flex flex-col items-center animate-in zoom-in-95 duration-200"
+              className="relative w-full max-w-sm bg-slate-900 border border-slate-800 rounded-3xl overflow-y-auto max-h-[90vh] shadow-2xl p-6 flex flex-col items-center animate-in zoom-in-95 duration-200"
               onClick={(e) => e.stopPropagation()}
             >
               {/* Close Button */}
@@ -2043,6 +2178,105 @@ export default function Chat() {
                   "{info.about}"
                 </p>
               )}
+
+              {/* Group members + Add member (groups only) */}
+              {!isOneToOne && avatarMenuChat.id && (() => {
+                const groupMembers = avatarMenuChat.members || []
+                const memberIds = new Set(groupMembers.map(m => m.user_id))
+
+                // Candidates = your 1-on-1 contacts who are not already in this group
+                const candidateMap = new Map()
+                chats
+                  .filter(c => c.type === 'one_to_one')
+                  .forEach(c => {
+                    const other = c.members?.find(m => m.user_id !== user?.id)?.user
+                    if (other && !memberIds.has(other.id)) candidateMap.set(other.id, other)
+                  })
+                const candidates = Array.from(candidateMap.values())
+
+                return (
+                  <div className="w-full mt-5">
+                    <div className="flex items-center justify-between mb-2">
+                      <span className="text-[11px] font-semibold text-slate-400 uppercase tracking-wider">
+                        Members ({groupMembers.length})
+                      </span>
+                      <button
+                        onClick={() => { setShowAddMembers(v => !v); setAddMemberSelection([]) }}
+                        className="flex items-center gap-1 px-2.5 py-1 bg-emerald-500/15 hover:bg-emerald-500/25 border border-emerald-500/30 text-emerald-400 rounded-lg text-[11px] font-semibold transition cursor-pointer"
+                      >
+                        <UserPlus className="w-3.5 h-3.5" />
+                        {showAddMembers ? 'Cancel' : 'Add member'}
+                      </button>
+                    </div>
+
+                    {/* Current members */}
+                    <div className="max-h-28 overflow-y-auto rounded-xl border border-slate-800 bg-slate-950/40 divide-y divide-slate-800/60">
+                      {groupMembers.map(m => (
+                        <div key={m.user_id} className="flex items-center gap-2.5 px-3 py-2">
+                          <div className="w-7 h-7 rounded-full bg-slate-950 border border-slate-800 overflow-hidden flex items-center justify-center shrink-0">
+                            {m.user?.profile_image ? (
+                              <img src={`${BACKEND_URL}${m.user.profile_image}`} alt="" className="w-full h-full object-cover" />
+                            ) : (
+                              <User className="w-3.5 h-3.5 text-slate-500" />
+                            )}
+                          </div>
+                          <span className="text-xs font-medium text-slate-200 truncate flex-1">
+                            {m.user?.username || 'Unknown'}
+                          </span>
+                          {m.user_id === user?.id && (
+                            <span className="text-[10px] text-indigo-300 bg-indigo-500/15 border border-indigo-500/25 px-1.5 py-0.5 rounded-md">You</span>
+                          )}
+                        </div>
+                      ))}
+                    </div>
+
+                    {/* Add-member picker */}
+                    {showAddMembers && (
+                      <div className="mt-3 rounded-xl border border-emerald-500/20 bg-emerald-500/5 p-2">
+                        {candidates.length === 0 ? (
+                          <p className="text-xs text-slate-400 text-center py-3 px-2">
+                            No more contacts to add. Add a contact first, then come back here.
+                          </p>
+                        ) : (
+                          <>
+                            <div className="max-h-32 overflow-y-auto space-y-1">
+                              {candidates.map(c => {
+                                const selected = addMemberSelection.includes(c.id)
+                                return (
+                                  <div
+                                    key={c.id}
+                                    onClick={() => setAddMemberSelection(prev =>
+                                      prev.includes(c.id) ? prev.filter(id => id !== c.id) : [...prev, c.id]
+                                    )}
+                                    className={`flex items-center gap-2.5 px-2 py-1.5 rounded-lg cursor-pointer transition ${selected ? 'bg-emerald-500/15' : 'hover:bg-slate-800/50'}`}
+                                  >
+                                    <div className="w-7 h-7 rounded-full bg-slate-950 border border-slate-800 overflow-hidden flex items-center justify-center shrink-0">
+                                      {c.profile_image ? (
+                                        <img src={`${BACKEND_URL}${c.profile_image}`} alt="" className="w-full h-full object-cover" />
+                                      ) : (
+                                        <User className="w-3.5 h-3.5 text-slate-500" />
+                                      )}
+                                    </div>
+                                    <span className="text-xs font-medium text-slate-200 truncate flex-1">{c.username}</span>
+                                    <input type="checkbox" checked={selected} readOnly className="w-3.5 h-3.5 accent-emerald-500 cursor-pointer" />
+                                  </div>
+                                )
+                              })}
+                            </div>
+                            <button
+                              onClick={handleAddMembers}
+                              disabled={addMemberSelection.length === 0 || addingMembers}
+                              className="w-full mt-2 py-2 bg-gradient-to-r from-emerald-500 to-teal-500 text-white text-xs font-semibold rounded-lg hover:opacity-90 active:scale-95 transition cursor-pointer disabled:opacity-40 disabled:pointer-events-none"
+                            >
+                              {addingMembers ? 'Adding...' : `Add ${addMemberSelection.length || ''} selected`.replace('  ', ' ')}
+                            </button>
+                          </>
+                        )}
+                      </div>
+                    )}
+                  </div>
+                )
+              })()}
 
               {/* Action Buttons Row */}
               <div className="grid grid-cols-3 gap-2 w-full mt-5">
