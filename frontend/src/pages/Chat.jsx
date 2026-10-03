@@ -560,7 +560,7 @@ export default function Chat() {
       </header>
 
       {/* MAIN ROW: nav rail + sidebar + chat workspace */}
-      <div className="flex flex-1 min-h-0 w-full relative">
+      <div className="flex flex-1 min-h-0 w-full relative overflow-hidden transform-gpu">
 
       {/* 0. WEBSITE LEFT-SIDE NAVBAR (NAV RAIL) */}
       <nav className={`chat-nav-rail hidden md:flex flex-col items-center justify-between py-4 w-[72px] border-r z-20 shrink-0 select-none shadow-2xl transition-colors ${
@@ -706,7 +706,7 @@ export default function Chat() {
       </nav>
 
       {/* 1. SECONDARY SIDEBAR */}
-      <div className={`chat-sidebar h-full border-r flex flex-col shrink-0 relative transition-colors ${
+      <div style={{ height: '100%', maxHeight: '100%' }} className={`chat-sidebar h-full border-r flex flex-col shrink-0 relative transition-colors ${
         isLight ? 'bg-white border-slate-200' : 'bg-slate-900/40 backdrop-blur-md border-slate-800'
       } ${mobileView === 'chat' ? 'mobile-hidden' : ''}`}>
         
@@ -1286,7 +1286,7 @@ export default function Chat() {
       </div>
 
       {/* 2. CHAT MAIN WORKSPACE */}
-      <div className={`chat-panel h-full flex-col relative transition-colors ${
+      <div style={{ height: '100%', maxHeight: '100%' }} className={`chat-panel h-full flex-col relative transition-colors ${
         isLight ? 'bg-slate-100/60' : 'bg-slate-950/20'
       } ${mobileView === 'sidebar' ? 'mobile-hidden' : ''}`}>
         {activeChat ? (
