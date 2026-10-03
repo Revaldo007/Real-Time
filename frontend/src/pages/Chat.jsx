@@ -545,22 +545,80 @@ export default function Chat() {
     return `${m}:${s}`
   }
 
+  // ── Keep panel headers clear of the project title bar ───────────────────
+  // Measures how far the sidebar / chat panel reach up underneath the title
+  // bar (e.g. when the global CSS pins them to the top of the window on small
+  // screens) and pushes their content down by exactly that amount.
+  const titleBarRef = useRef(null)
+  const [titleOverlap, setTitleOverlap] = useState(0)
+  useEffect(() => {
+    const measure = () => {
+      const bar = titleBarRef.current
+      if (!bar) return
+      const barBottom = bar.getBoundingClientRect().bottom
+      let overlap = 0
+      document
+        .querySelectorAll('.chat-shell .chat-sidebar, .chat-shell .chat-panel')
+        .forEach((el) => {
+          if (getComputedStyle(el).display === 'none') return
+          overlap = Math.max(overlap, barBottom - el.getBoundingClientRect().top)
+        })
+      overlap = Math.max(0, Math.round(overlap))
+      setTitleOverlap((prev) => (prev === overlap ? prev : overlap))
+    }
+    measure()
+    const raf = requestAnimationFrame(measure)
+    window.addEventListener('resize', measure)
+    return () => {
+      cancelAnimationFrame(raf)
+      window.removeEventListener('resize', measure)
+    }
+  }, [mobileView, sidebarTab, activeChat?.id, showSelectContact])
+
   const emojis = ['😊', '😂', '👍', '❤️', '🔥', '👏', '😮', '😢', '🎉', '💡', '💬', '🚀']
 
   return (
-    <div className={`flex flex-col h-screen w-screen overflow-hidden relative transition-colors duration-200 ${
+    <div style={{ height: 'var(--visual-viewport-height, 100dvh)', '--title-overlap': `${titleOverlap}px` }} className={`chat-shell flex flex-col w-screen overflow-hidden relative transition-colors duration-200 ${
       isLight ? 'bg-slate-100 text-slate-900' : 'bg-slate-950 text-slate-100'
     }`}>
       
+      {/* Keep mobile panels inside the area below the title bar
+          (overrides any fixed / full-viewport positioning from the global CSS) */}
+      <style>{`
+        .chat-shell .chat-sidebar,
+        .chat-shell .chat-panel { padding-top: var(--title-overlap, 0px) !important; }
+        @media (max-width: 767px) {
+          .chat-shell .chat-sidebar,
+          .chat-shell .chat-panel {
+            position: relative !important;
+            top: auto !important; right: auto !important;
+            bottom: auto !important; left: auto !important;
+            inset: auto !important;
+            height: 100% !important;
+            max-height: 100% !important;
+            width: 100% !important;
+            flex: 1 1 0% !important;
+            min-width: 0 !important;
+            min-height: 0 !important;
+            transform: none !important;
+          }
+          .chat-shell .chat-sidebar.mobile-hidden,
+          .chat-shell .chat-panel.mobile-hidden { display: none !important; }
+        }
+      `}</style>
+
       {/* PROJECT TITLE - TOP HEADER */}
-      <header className={`shrink-0 h-12 px-4 border-b flex items-center justify-center z-30 transition-colors ${
+      <header ref={titleBarRef} className={`shrink-0 h-12 px-4 border-b flex items-center justify-center z-30 transition-colors ${
         isLight ? 'bg-white border-slate-200' : 'bg-slate-950 border-slate-800/80'
       }`}>
         <AppTitle isLight={isLight} compact className="w-full max-w-3xl" />
       </header>
 
       {/* MAIN ROW: nav rail + sidebar + chat workspace */}
-      <div className="flex flex-1 min-h-0 w-full relative overflow-hidden transform-gpu">
+      <div
+        className="flex flex-1 min-h-0 w-full relative overflow-hidden"
+        style={{ transform: 'translateZ(0)', contain: 'layout paint' }}
+      >
 
       {/* 0. WEBSITE LEFT-SIDE NAVBAR (NAV RAIL) */}
       <nav className={`chat-nav-rail hidden md:flex flex-col items-center justify-between py-4 w-[72px] border-r z-20 shrink-0 select-none shadow-2xl transition-colors ${
