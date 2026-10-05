@@ -17,7 +17,7 @@ const ProtectedRoute = ({ children }) => {
     return (
       <div className="min-h-screen w-screen bg-slate-950 flex flex-col items-center justify-center text-slate-400 gap-4">
         <div className="w-12 h-12 border-4 border-indigo-500/20 border-t-indigo-500 rounded-full animate-spin" />
-        <span className="text-sm font-semibold tracking-wide">Loading Rivo...</span>
+        <span className="text-sm font-semibold tracking-wide">Loading Real-Time chat...</span>
       </div>
     )
   }

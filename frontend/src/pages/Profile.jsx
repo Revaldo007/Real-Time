@@ -87,7 +87,7 @@ export default function Profile() {
             <h1 className="text-2xl font-bold font-outfit bg-gradient-to-r from-indigo-400 to-violet-400 bg-clip-text text-transparent">
               Edit Profile
             </h1>
-            <p className="text-xs text-slate-400">Update your public presence in Rivo</p>
+            <p className="text-xs text-slate-400">Update your public presence in Real-Time chat</p>
           </div>
         </div>
 

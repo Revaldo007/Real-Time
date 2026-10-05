@@ -248,7 +248,7 @@ export default function Login() {
             <MessageSquare className="w-5 h-5 text-white" />
           </div>
           <div>
-            <span className="text-xl font-black text-white tracking-tight">Rivo</span>
+            <span className="text-xl font-black text-white tracking-tight">Real-Time chat</span>
             <span className="ml-2 text-xs text-indigo-400 font-semibold">Messenger</span>
           </div>
         </div>
@@ -293,7 +293,7 @@ export default function Login() {
               {/* Heading */}
               <div className="text-center">
                 <h2 className="text-2xl sm:text-3xl font-black text-white tracking-tight leading-tight">
-                  Welcome to <span className="text-transparent bg-clip-text bg-gradient-to-r from-indigo-400 to-violet-400">Rivo</span>
+                  Welcome to <span className="text-transparent bg-clip-text bg-gradient-to-r from-indigo-400 to-violet-400">Real-Time chat</span>
                 </h2>
                 <p className="mt-2 text-sm text-slate-400 leading-relaxed max-w-xs mx-auto">
                   Read our{' '}
@@ -544,7 +544,7 @@ export default function Login() {
                 </button>
                 <div>
                   <h2 className="text-lg font-bold text-white">Link with QR Code</h2>
-                  <p className="text-xs text-slate-400">Scan using Rivo on your primary phone</p>
+                  <p className="text-xs text-slate-400">Scan using Real-Time chat on your primary phone</p>
                 </div>
               </div>
 
@@ -555,7 +555,7 @@ export default function Login() {
                   </div>
                 </div>
                 <p className="text-xs text-slate-400 text-center px-4 leading-relaxed">
-                  Open Rivo on your primary device → Menu → Linked Devices → Scan this code
+                  Open Real-Time chat on your primary device → Menu → Linked Devices → Scan this code
                 </p>
               </div>
 

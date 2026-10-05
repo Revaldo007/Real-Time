@@ -735,11 +735,11 @@ export default function Chat() {
           <button 
             onClick={() => { setSidebarTab('chats'); setShowNewContact(false); setShowSelectContact(false); }}
             className={`w-11 h-11 rounded-2xl bg-gradient-to-tr ${currentAccent.gradient} flex items-center justify-center text-white shadow-lg ${currentAccent.glow} hover:scale-105 active:scale-95 transition-all cursor-pointer group relative`}
-            title="Rivo Messenger"
+            title="Real-Time chat Messenger"
           >
             <MessageSquare className="w-5 h-5 fill-white/20" />
             <span className="absolute left-full ml-3 px-2.5 py-1 bg-slate-800 text-slate-200 text-xs font-medium rounded-lg whitespace-nowrap opacity-0 group-hover:opacity-100 pointer-events-none transition-opacity shadow-xl border border-slate-700 z-50">
-              Rivo Messenger
+              Real-Time chat Messenger
             </span>
           </button>
 
@@ -1371,7 +1371,7 @@ export default function Chat() {
 
                 {/* Contacts Section Header */}
                 <div className="px-4 py-2.5 text-xs font-semibold text-indigo-400 bg-slate-950/60 uppercase tracking-wider">
-                  Contacts on Rivo
+                  Contacts on Real-Time chat
                 </div>
 
                 {/* Contacts Items */}
@@ -1932,7 +1932,7 @@ export default function Chat() {
             <div className="w-20 h-20 bg-gradient-to-br from-indigo-500/10 to-violet-500/10 border border-indigo-500/20 rounded-3xl flex items-center justify-center shadow-lg shadow-indigo-500/5 mb-6">
               <MessageSquare className="w-10 h-10 text-indigo-400/60" />
             </div>
-            <h2 className="text-xl font-bold font-outfit text-slate-300">Rivo Messenger</h2>
+            <h2 className="text-xl font-bold font-outfit text-slate-300">Real-Time chat Messenger</h2>
             <p className="text-xs text-slate-500 max-w-sm mt-2 leading-relaxed">
               Send instant encrypted messages, documents, media, and voice notes. Initiate secure peer-to-peer audio and video calls.
             </p>
@@ -2049,7 +2049,7 @@ export default function Chat() {
               <div>
                 <h3 className="text-xl font-bold font-outfit">{callUser?.username}</h3>
                 <p className="text-sm text-slate-400 mt-1 flex items-center gap-1.5 justify-center">
-                  <span className="w-1.5 h-1.5 rounded-full bg-indigo-400 animate-ping" /> Incoming Rivo {callType === 'video' ? 'Video' : 'Audio'} Call...
+                  <span className="w-1.5 h-1.5 rounded-full bg-indigo-400 animate-ping" /> Incoming Real-Time chat {callType === 'video' ? 'Video' : 'Audio'} Call...
                 </p>
               </div>
 
