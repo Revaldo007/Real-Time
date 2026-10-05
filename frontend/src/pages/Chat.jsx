@@ -12,6 +12,37 @@ import {
   ArrowLeft, MoreVertical
 } from 'lucide-react'
 
+// ── Light-mode safety net ───────────────────────────────────────────────────
+// Many panels (contacts, new-contact, group modal, profile modal...) use dark-only
+// colour classes (text-slate-100, bg-slate-900 ...). In light mode that gives
+// near-white text on a white surface. These rules remap them. They skip the call
+// overlay (.keep-dark) and anything inside a gradient (coloured bubbles/headers).
+const lc = (...names) =>
+  ':is(' + names.map(n => `[class^="${n}"],[class*=" ${n}"]`).join(',') + ')'
+const LIGHT_SCOPE = '.chat-shell.chat-light'
+const LIGHT_SKIP = ':not(.keep-dark):not(.keep-dark *):not([class*="bg-gradient"] *)'
+const lightRule = (names, decl) => `${LIGHT_SCOPE} ${lc(...names)}${LIGHT_SKIP}{${decl}}`
+const LIGHT_MODE_CSS = [
+  // text
+  lightRule(['text-slate-100'], 'color:#0f172a'),
+  lightRule(['text-slate-200'], 'color:#1e293b'),
+  lightRule(['text-slate-300'], 'color:#334155'),
+  lightRule(['text-indigo-200', 'text-indigo-300'], 'color:#4338ca'),
+  lightRule(['text-violet-200', 'text-violet-300'], 'color:#6d28d9'),
+  lightRule(['text-emerald-300'], 'color:#047857'),
+  lightRule(['text-emerald-400'], 'color:#059669'),
+  lightRule(['text-rose-200', 'text-rose-300'], 'color:#be123c'),
+  // surfaces
+  lightRule(['bg-slate-900'], 'background-color:#ffffff'),
+  lightRule(['bg-slate-950'], 'background-color:#f1f5f9'),
+  lightRule(['bg-slate-800'], 'background-color:#e2e8f0'),
+  // borders
+  lightRule(['border-slate-800'], 'border-color:#e2e8f0'),
+  lightRule(['border-slate-700'], 'border-color:#cbd5e1'),
+  // hover tooltips on the nav rail stay dark-on-light-text
+  `${LIGHT_SCOPE} [class*="bg-slate-800"][class*="group-hover:opacity-100"]{background-color:#1e293b;color:#e2e8f0;border-color:#334155}`,
+].join('\n')
+
 export default function Chat() {
   const { user, logout } = useContext(AuthContext)
   const {
@@ -613,7 +644,7 @@ export default function Chat() {
   const emojis = ['😊', '😂', '👍', '❤️', '🔥', '👏', '😮', '😢', '🎉', '💡', '💬', '🚀']
 
   return (
-    <div style={{ height: 'var(--visual-viewport-height, 100dvh)', '--title-overlap': `${titleOverlap}px` }} className={`chat-shell flex flex-col w-screen overflow-hidden relative transition-colors duration-200 ${
+    <div style={{ height: 'var(--visual-viewport-height, 100dvh)', '--title-overlap': `${titleOverlap}px` }} className={`chat-shell ${isLight ? 'chat-light' : ''} flex flex-col w-screen overflow-hidden relative transition-colors duration-200 ${
       isLight ? 'bg-slate-100 text-slate-900' : 'bg-slate-950 text-slate-100'
     }`}>
       
@@ -645,6 +676,23 @@ export default function Chat() {
         }
         .chat-shell .chat-sidebar,
         .chat-shell .chat-panel { padding-top: var(--title-overlap, 0px) !important; }
+        /* Profile / group modal: keep every row at its natural height so the name
+           is never squashed by the "Group • N members" line; the card scrolls instead */
+        .chat-shell .profile-modal > * { flex-shrink: 0; }
+        /* Short windows: compact the left nav rail so Settings / Profile / Logout
+           stay reachable (scrolls if it still doesn't fit) */
+        @media (max-height: 640px) {
+          .chat-shell .chat-nav-rail {
+            justify-content: flex-start !important;
+            gap: 14px;
+            padding-top: 8px; padding-bottom: 8px;
+            overflow-y: auto;
+            scrollbar-width: none;
+          }
+          .chat-shell .chat-nav-rail::-webkit-scrollbar { display: none; }
+          .chat-shell .chat-nav-rail > div { gap: 10px !important; flex-shrink: 0; }
+        }
+        ${LIGHT_MODE_CSS}
         @media (max-width: 767px) {
           .chat-shell .chat-sidebar,
           .chat-shell .chat-panel {
@@ -1024,9 +1072,9 @@ export default function Chat() {
         {sidebarTab === 'contacts' && (
           <>
             {/* Contacts Header */}
-            <div className="h-16 px-4 border-b border-slate-800 flex items-center justify-between relative bg-slate-900/50">
+            <div className={`h-16 px-4 border-b flex items-center justify-between relative ${isLight ? 'bg-slate-50 border-slate-200' : 'border-slate-800 bg-slate-900/50'}`}>
               <div>
-                <h1 className="text-base font-bold font-outfit text-white tracking-tight">Contacts</h1>
+                <h1 className={`text-base font-bold font-outfit tracking-tight ${isLight ? 'text-slate-900' : 'text-white'}`}>Contacts</h1>
                 <span className="text-[11px] text-slate-400">{contactsList.length} users registered</span>
               </div>
               <button
@@ -1060,17 +1108,17 @@ export default function Chat() {
             {/* Quick Action: Add New Contact Card */}
             <div
               onClick={() => setShowNewContact(true)}
-              className="m-3 p-3 bg-gradient-to-r from-indigo-950/40 via-slate-900 to-violet-950/40 border border-indigo-500/20 hover:border-indigo-400/50 rounded-2xl flex items-center gap-3 cursor-pointer transition-all hover:scale-[1.01] active:scale-[0.99] group shadow-md"
+              className={`m-3 p-3 bg-gradient-to-r border rounded-2xl flex items-center gap-3 cursor-pointer transition-all hover:scale-[1.01] active:scale-[0.99] group shadow-md ${isLight ? 'from-indigo-50 via-white to-violet-50 border-indigo-200 hover:border-indigo-400' : 'from-indigo-950/40 via-slate-900 to-violet-950/40 border-indigo-500/20 hover:border-indigo-400/50'}`}
             >
               <div className="w-10 h-10 rounded-xl bg-gradient-to-tr from-emerald-500 to-indigo-500 flex items-center justify-center text-white shadow-md shadow-emerald-500/20 group-hover:scale-105 transition-transform shrink-0">
                 <UserPlus className="w-5 h-5" />
               </div>
               <div className="flex-1 min-w-0">
-                <h4 className="text-xs font-semibold text-slate-100 group-hover:text-white flex items-center gap-1.5">
+                <h4 className={`text-xs font-semibold flex items-center gap-1.5 ${isLight ? 'text-slate-900' : 'text-slate-100 group-hover:text-white'}`}>
                   Add New Contact
-                  <span className="text-[10px] px-1.5 py-0.2 rounded-full bg-emerald-500/20 text-emerald-300 font-medium">Quick</span>
+                  <span className={`text-[10px] px-1.5 py-0.2 rounded-full bg-emerald-500/20 font-medium ${isLight ? 'text-emerald-700' : 'text-emerald-300'}`}>Quick</span>
                 </h4>
-                <p className="text-[11px] text-slate-400 truncate">Enter phone number to chat instantly</p>
+                <p className={`text-[11px] truncate ${isLight ? 'text-slate-600' : 'text-slate-400'}`}>Enter phone number to chat instantly</p>
               </div>
             </div>
 
@@ -1128,7 +1176,7 @@ export default function Chat() {
                             startDirectChat(contact.id)
                             setSidebarTab('chats')
                           }}
-                          className="px-3 py-1.5 bg-indigo-600/15 hover:bg-indigo-600/25 border border-indigo-500/30 hover:border-indigo-400 text-indigo-300 hover:text-white rounded-xl text-xs font-semibold transition active:scale-95 cursor-pointer shrink-0"
+                          className={`px-3 py-1.5 bg-indigo-600/15 hover:bg-indigo-600/25 border border-indigo-500/30 hover:border-indigo-400 rounded-xl text-xs font-semibold transition active:scale-95 cursor-pointer shrink-0 ${isLight ? 'text-indigo-700 hover:text-indigo-900' : 'text-indigo-300 hover:text-white'}`}
                         >
                           Message
                         </button>
@@ -1983,7 +2031,7 @@ export default function Chat() {
 
       {/* 4. WebRTC VIDEO/AUDIO CALL OVERLAY */}
       {callState && (
-        <div className="absolute inset-0 z-50 flex flex-col items-center justify-center bg-slate-950/95 backdrop-blur-md p-6 select-none animate-fade-in text-slate-100">
+        <div className="keep-dark absolute inset-0 z-50 flex flex-col items-center justify-center bg-slate-950/95 backdrop-blur-md p-6 select-none animate-fade-in text-slate-100">
           
           {/* Hidden audio element for remote audio in voice calls */}
           <audio ref={remoteAudioRef} autoPlay playsInline className="hidden" />
@@ -2109,17 +2157,17 @@ export default function Chat() {
 
         return (
           <div 
-            className="fixed inset-x-0 bottom-0 top-12 z-50 bg-black/75 backdrop-blur-sm flex items-center justify-center p-4 animate-in fade-in duration-200"
+            className="fixed inset-x-0 bottom-0 top-12 z-50 bg-black/75 backdrop-blur-sm flex items-center justify-center p-3 sm:p-4 animate-in fade-in duration-200"
             onClick={() => setAvatarMenuChat(null)}
           >
             <div 
-              className="relative w-full max-w-sm bg-slate-900 border border-slate-800 rounded-3xl overflow-y-auto max-h-[90vh] shadow-2xl p-6 flex flex-col items-center animate-in zoom-in-95 duration-200"
+              className="profile-modal relative w-full max-w-sm bg-slate-900 border border-slate-800 rounded-3xl overflow-y-auto max-h-full shadow-2xl p-5 sm:p-6 flex flex-col items-center animate-in zoom-in-95 duration-200"
               onClick={(e) => e.stopPropagation()}
             >
               {/* Close Button */}
               <button 
                 onClick={() => setAvatarMenuChat(null)}
-                className="absolute top-4 right-4 p-1.5 text-slate-400 hover:text-white bg-slate-800/80 hover:bg-slate-750 rounded-full transition cursor-pointer"
+                className={`absolute top-3 right-3 sm:top-4 sm:right-4 p-1.5 rounded-full transition cursor-pointer z-10 ${isLight ? 'text-slate-600 hover:text-slate-900 bg-slate-200/80 hover:bg-slate-300' : 'text-slate-400 hover:text-white bg-slate-800/80 hover:bg-slate-750'}`}
                 title="Close"
               >
                 <X className="w-4 h-4" />
@@ -2127,7 +2175,7 @@ export default function Chat() {
 
               {/* Large Profile Avatar */}
               <div className="relative group my-2">
-                <div className="w-24 h-24 sm:w-28 sm:h-28 rounded-full bg-slate-950 border-4 border-slate-800 shadow-2xl overflow-hidden flex items-center justify-center">
+                <div className="w-20 h-20 sm:w-28 sm:h-28 rounded-full bg-slate-950 border-4 border-slate-800 shadow-2xl overflow-hidden flex items-center justify-center">
                   {info.image ? (
                     <img 
                       src={`${BACKEND_URL}${info.image}`} 
@@ -2147,7 +2195,7 @@ export default function Chat() {
               </div>
 
               {/* Name */}
-              <h3 className="text-xl font-bold text-white mt-2 font-outfit text-center truncate max-w-[260px]">
+              <h3 className={`text-xl font-bold mt-2 font-outfit text-center truncate leading-snug w-full ${isLight ? 'text-slate-900' : 'text-white'}`}>
                 {info.name}
               </h3>
               
@@ -2163,7 +2211,7 @@ export default function Chat() {
                     <span className="text-xs text-slate-400">Offline</span>
                   )
                 ) : (
-                  <span className="text-xs text-slate-400">
+                  <span className={`text-xs ${isLight ? 'text-slate-600' : 'text-slate-400'}`}>
                     Group • {avatarMenuChat.members?.length || 0} members
                   </span>
                 )}

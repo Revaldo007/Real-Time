@@ -24,6 +24,28 @@ const TABS = [
   { id: 'wallpaper',label: 'Chat Background',  icon: ImageIcon },
 ]
 
+// ── shared section card wrapper (module-level so panels aren't remounted) ──
+const Card = ({ children, isLight }) => (
+  <div className={`p-5 sm:p-6 rounded-3xl border transition-all ${
+    isLight ? 'bg-white border-slate-200 shadow-sm' : 'bg-slate-900/60 border-slate-800 shadow-xl backdrop-blur-md'
+  }`}>
+    {children}
+  </div>
+)
+
+// ── section title ───────────────────────────────────────────────────────────
+const SectionTitle = ({ icon: Icon, iconBg, label, sub }) => (
+  <div className="flex items-center gap-2.5 mb-5 min-w-0">
+    <div className={`p-2 rounded-xl shrink-0 ${iconBg}`}>
+      <Icon className="w-4 h-4" />
+    </div>
+    <div className="min-w-0">
+      <h3 className="text-sm font-bold font-outfit">{label}</h3>
+      {sub && <p className="text-xs text-slate-400">{sub}</p>}
+    </div>
+  </div>
+)
+
 export default function Settings() {
   const navigate   = useNavigate()
   const fileInputRef = useRef(null)
@@ -71,34 +93,12 @@ export default function Settings() {
     triggerToast()
   }
 
-  // ── shared section card wrapper ──────────────────────────────────────────
-  const Card = ({ children }) => (
-    <div className={`p-5 sm:p-6 rounded-3xl border transition-all ${
-      isLight ? 'bg-white border-slate-200 shadow-sm' : 'bg-slate-900/60 border-slate-800 shadow-xl backdrop-blur-md'
-    }`}>
-      {children}
-    </div>
-  )
-
-  // ── section title ─────────────────────────────────────────────────────────
-  const SectionTitle = ({ icon: Icon, iconBg, label, sub }) => (
-    <div className="flex items-center gap-2.5 mb-5">
-      <div className={`p-2 rounded-xl ${iconBg}`}>
-        <Icon className="w-4 h-4" />
-      </div>
-      <div>
-        <h3 className="text-sm font-bold font-outfit">{label}</h3>
-        {sub && <p className="text-xs text-slate-400">{sub}</p>}
-      </div>
-    </div>
-  )
-
   // ─────────────────────────────────────────────────────────────────────────
   // SECTION PANELS
   // ─────────────────────────────────────────────────────────────────────────
 
   const PanelTheme = () => (
-    <Card>
+    <Card isLight={isLight}>
       <SectionTitle icon={Sun} iconBg="bg-indigo-500/15 text-indigo-400" label="Interface Mode" sub="Switch between deep dark mode and clean light mode" />
       <div className="grid grid-cols-2 gap-4">
         {/* Dark */}
@@ -151,7 +151,7 @@ export default function Settings() {
   )
 
   const PanelFont = () => (
-    <Card>
+    <Card isLight={isLight}>
       <SectionTitle icon={Baseline} iconBg="bg-sky-500/15 text-sky-400" label="Chat Font Family" sub="Choose the typeface used across all chat messages and bubbles" />
       <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
         {FONT_FAMILIES.map((ff) => {
@@ -202,7 +202,7 @@ export default function Settings() {
   )
 
   const PanelTextColor = () => (
-    <Card>
+    <Card isLight={isLight}>
       <SectionTitle icon={ALargeSmall} iconBg="bg-pink-500/15 text-pink-400" label="Text & Font Styling" sub="Outgoing bubble font color and message text scale" />
 
       {/* Bubble Font Color */}
@@ -271,7 +271,7 @@ export default function Settings() {
   )
 
   const PanelAccent = () => (
-    <Card>
+    <Card isLight={isLight}>
       <SectionTitle icon={Palette} iconBg="bg-emerald-500/15 text-emerald-400" label="Accent & Bubble Color" sub="Controls outgoing message bubble color, active states, and buttons" />
       <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
         {ACCENT_PRESETS.map((acc) => {
@@ -300,8 +300,8 @@ export default function Settings() {
   )
 
   const PanelWallpaper = () => (
-    <Card>
-      <div className="flex items-center justify-between mb-5">
+    <Card isLight={isLight}>
+      <div className="flex flex-wrap items-center justify-between gap-x-3 mb-5">
         <SectionTitle icon={ImageIcon} iconBg="bg-violet-500/15 text-violet-400" label="Chat Background Wallpaper" sub="Choose a preset or upload your own image" />
         <div className="flex items-center gap-2 shrink-0">
           <input ref={fileInputRef} type="file" accept="image/*" onChange={handleImageUpload} className="hidden" />
@@ -382,11 +382,11 @@ export default function Settings() {
   )
 
   const PANELS = {
-    theme:     <PanelTheme />,
-    font:      <PanelFont />,
-    size:      <PanelTextColor />,
-    accent:    <PanelAccent />,
-    wallpaper: <PanelWallpaper />,
+    theme:     PanelTheme(),
+    font:      PanelFont(),
+    size:      PanelTextColor(),
+    accent:    PanelAccent(),
+    wallpaper: PanelWallpaper(),
   }
 
   // ─────────────────────────────────────────────────────────────────────────
@@ -448,7 +448,7 @@ export default function Settings() {
 
       {/* ── Main: 3-column (nav | panel | preview) ────────────────────────── */}
       <main className="max-w-7xl mx-auto p-4 sm:p-6 lg:p-8">
-        <div className="flex gap-6 items-start">
+        <div className="flex flex-col lg:flex-row gap-4 lg:gap-6 items-stretch lg:items-start">
 
           {/* ── LEFT NAV TABS ──────────────────────────────────────────────── */}
           <nav className={`hidden lg:flex flex-col gap-1 w-48 shrink-0 sticky top-20 rounded-3xl border p-2 ${
@@ -478,8 +478,11 @@ export default function Settings() {
           </nav>
 
           {/* ── MOBILE TABS (horizontal scroll) ────────────────────────────── */}
-          <div className="lg:hidden w-full mb-4">
-            <div className="flex gap-2 overflow-x-auto pb-1 no-scrollbar">
+          <div className="lg:hidden w-full min-w-0">
+            <div
+              className="flex gap-2 overflow-x-auto pb-1 [&::-webkit-scrollbar]:hidden"
+              style={{ scrollbarWidth: 'none', msOverflowStyle: 'none' }}
+            >
               {TABS.map((tab) => {
                 const Icon = tab.icon
                 const active = activeTab === tab.id
@@ -502,14 +505,8 @@ export default function Settings() {
           </div>
 
           {/* ── CENTER: ACTIVE PANEL ───────────────────────────────────────── */}
-          <div className="flex-1 min-w-0">
-            {/* Mobile tabs render above on small screens, desktop panel renders here */}
-            <div className="hidden lg:block">
-              {PANELS[activeTab]}
-            </div>
-            <div className="lg:hidden">
-              {PANELS[activeTab]}
-            </div>
+          <div className="w-full lg:flex-1 min-w-0">
+            {PANELS[activeTab]}
           </div>
 
           {/* ── RIGHT: LIVE PREVIEW ───────────────────────────────────────── */}
